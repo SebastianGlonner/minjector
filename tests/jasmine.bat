@@ -1,1 +1,1 @@
-jasmine-node --verbose --forceExit specsDev
+jasmine-node --verbose --forceExit specs
