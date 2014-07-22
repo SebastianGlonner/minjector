@@ -1,12 +1,17 @@
 /**
- * AMD / CommonJS modules implementation.
- * It does not intent to be a complete
- * AMD / CommonJS implementation. There might be functionality we
+ * Minjector is an Asynchronous Module Definition (AMD) specification
+ * implementation. It does not intent to be a complete
+ * AMD implementation. There might be specifications we
  * are not interested in.
- * For example we do not (re)implement "require".
  *
  * However this piece of code is intended to be light weight (mobile first)
- * and run in any environment (browser, nodejs).
+ * and run in "any" environment (browser, nodejs) (any does not fit
+ * correctly since i do not support any browser ;) ).
+ *
+ * Known missing specifications implementations:
+ * - loader plugins
+ * - missing some configuration values (as it is "allowed" ;) )
+ * - no global require (as it is "allowed" ;) )
  *
  * Global definitions:
  *   // Define function
@@ -34,7 +39,12 @@
 var MinjectorClass = function(cfg) {
   this.config(cfg);
   this.contextId = null;
-  this.cache = {};
+
+  // Add local require
+  this.cache = {
+    'require': this.require.bind(this)
+  };
+
   this.defineQueue = [];
   this.processingWaitingForNextTick = false;
 
@@ -358,6 +368,22 @@ _proto.processOnNextTick = function() {
     process.nextTick(this.Bound.processDefineQueue);
   } else {
     window.setTimeout(this.Bound.processDefineQueue, 0);
+  }
+};
+
+
+/**
+ * Local require implementation.
+ * @param  {mixed}    id
+ * @param  {function} callback
+ * @return {mixed} The required module on synchronous call.
+ * @this {Minjector}
+ */
+_proto.require = function(id, callback) {
+  if (typeof id === 'string') {
+    return this.cache[id];
+  } else {
+    define.call(this, id, callback);
   }
 };
 

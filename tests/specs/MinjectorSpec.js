@@ -2,12 +2,14 @@ describe('minjector', function() {
   // ATTENTION:
   // This test spec is supposed to run in node AND browser.
 
+  // TODO node-jasmine seams to execute only 1 describe() suite?
+
   var isNodeJs =
       typeof exports !== 'undefined' && this.exports !== exports;
 
   if (isNodeJs) {
     var config = require(process.cwd() + '/bootstrap.node.js');
-    require(config.DIR.SRC + 'minjector');
+    require(config.DIR.BIN + 'minjector');
 
     Minjector.config({
       baseUrl: config.DIR.TESTS_DATA
@@ -215,14 +217,28 @@ describe('minjector', function() {
       });
     });
 
+    it('and handle multiple anonym modules in single file', function(done) {
+      define(['OverwriteModule'], function(OverwriteModule) {
+        expect(typeof OverwriteModule).toBe('object');
+        expect(OverwriteModule.anonym2).toBe(2);
+        done();
+      });
+    });
+
   });
 
-  // For the sake of overall goal of teh most trivial implementation as
-  // possible, we dont implement/overwrite require().
-  //
-  // Because if you need Node.js require() for Node.js modules you cannot use
-  // this module/file for the browser anyway!
-  xdescribe('can handle AMD require', function() {
+  describe('can handle AMD local require', function() {
+    it('and load modules asynchronous', function(done) {
+      define(['require'], function(require) {
+        expect(typeof require).toBe('function');
+
+        require(['RequiredModule'], function(RequiredModule) {
+          expect(typeof RequiredModule).toBe('object');
+          expect(RequiredModule.justRequired).toBe('AMD');
+          done();
+        });
+      });
+    });
 
     // This is actually nonesense in browsers / asynchronous dependencies
     // resolution, to realize this we would have to wait for the first
@@ -230,43 +246,32 @@ describe('minjector', function() {
     // the first one. But we definitely want to start load all dependencies
     // immediately.
     // ... continue on next it(...).
-    xit('and handle multiple mixed modules in same file', function(done) {
-      define(['MixedModule', 'MixedId'], function(AnyModule, MixedModule) {
-        expect(typeof AnyModule).toBe('object');
-        expect(AnyModule.anonym2).toBe(2);
-
+    xit('and handle stupid dependency order (SKIPPED)', function(done) {
+      define(['MixedModule', 'MixedId'], function(MixedModule, MixedId) {
         expect(typeof MixedModule).toBe('object');
-        expect(MixedModule.mixed).toBe('id');
+        expect(MixedModule.anonym1).toBe(1);
+
+        expect(typeof MixedId).toBe('object');
+        expect(MixedId.mixed).toBe('id');
         done();
       });
     });
 
     // However the second dependency might be a:
-    // MixedModule = require('MixedId');
+    // var SR2Module = require('CanBeRequiredSync');
     // which is a synchronous call by definition of the AMD spec and just
     // will/has to fail if the dependency is not available synchronously.
-    // However2 ... this feels dirty/unnecessary.
     it('and handle synchronous require() calls', function(done) {
-      define(['MixedModule', 'MixedId'], function(AnyModule/*, MixedModule*/) {
-        expect(typeof AnyModule).toBe('object');
-        expect(AnyModule.anonym2).toBe(2);
+      define(['require', 'SyncRequireModule'], function(require, SRModule) {
+        expect(typeof require).toBe('function');
+        expect(typeof SRModule).toBe('object');
 
-        var MixedModule = Minjector.require('MixedId');
-
-        expect(typeof MixedModule).toBe('object');
-        expect(MixedModule.mixed).toBe('id');
+        var SR2Module = require('CanBeRequiredSync');
+        expect(typeof SR2Module).toBe('object');
+        expect(SR2Module.iamSync).toBe('yes');
         done();
       });
     });
-
-    if (isNodeJs) {
-      it('and falls back to node js native requier', function(done) {
-        var fs = require('fs');
-        fs.exists(__filename, function() {
-          done();
-        });
-      });
-    }
   });
 
 });

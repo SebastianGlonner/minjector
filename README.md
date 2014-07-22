@@ -63,14 +63,13 @@ the module as dependency and all modules you loaded relative to this particular 
 And you need to normalize id/path to find cached modules.
 So far there are 3 disadvantages this way, i will go the other way.
 
-__No support for require like suggested in the AMD spec.__
+__No mixed/fallback require in node environments.__
 
-Currently I don't see why I should support require() in a multiple environment implementation.
-If you want to require a node module you probably want to use some node only functionality anyway
+If you want to require a node module you probably want to use some node only
+functionality anyway
 and there would be no point in using it on browser side either.
-
-If you want a module for both sides just use define() only.
-Therefore this implementation supports define(id, depndencies, factory); only.
+If you want a module for both sides just use define() only or local require().
+Or just require Node.js modules outside and define(['require', ...]).
 
 __No support for plugins like suggested in the AMD spec.__
 
