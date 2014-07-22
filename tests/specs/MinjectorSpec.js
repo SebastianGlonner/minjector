@@ -10,12 +10,12 @@ describe('minjector', function() {
     require(config.DIR.SRC + 'minjector');
 
     Minjector.config({
-      base: config.DIR.TESTS_DATA
+      baseUrl: config.DIR.TESTS_DATA
     });
   } else {
     // The minjector library will be loaded in the HTML spec file.
     Minjector.config({
-      base: './data/'
+      baseUrl: './data/'
     });
   }
 

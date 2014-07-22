@@ -25,7 +25,7 @@
  *
  * config: {
  *   // All modules will be searched relative to this base directory.
- *   base: './some/dir'
+ *   baseUrl: './some/dir'
  * }
  *
  * @param {object} cfg A configuration.
@@ -230,7 +230,7 @@ if (_proto.isNodeJs) {
    * @this {Minjector}
    */
   _proto.requireDependency = function(id) {
-    require(this.cfg.base + id);
+    require(this.cfg.baseUrl + id);
     return this.processDefineQueue(id);
   };
 
@@ -256,7 +256,7 @@ if (_proto.isNodeJs) {
       var _this = __this;
 
       var scriptTag = document.createElement('script');
-      scriptTag.src = _this.cfg.base + id + '.js';
+      scriptTag.src = _this.cfg.baseUrl + id + '.js';
       scriptTag.type = 'text/javascript';
       scriptTag.charset = 'utf-8';
       scriptTag._moduleId = id;
