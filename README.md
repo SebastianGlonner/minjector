@@ -1,7 +1,8 @@
 minjector
 =========
 
-Minjector implements an AMD like module resolution / environment.
+## Minjector implements an AMD like module loader for browsers and Node.js.
+
 [AMD Specification](https://github.com/amdjs/amdjs-api/blob/master/AMD.md)
 
 # Why / Goals
