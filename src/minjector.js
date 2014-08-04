@@ -38,15 +38,19 @@
  */
 var MinjectorClass = function(cfg) {
   this.config(cfg);
-  this.contextId = null;
+
+  this.cache = {};
 
   // Add local require
-  this.cache = {
-    'require': this.require.bind(this)
-  };
+  this.mockModule('require', this.require.bind(this));
 
+  // This separated caching object is required for situations where
+  // 2 modules in the same file (therefore running synchronous) require the
+  // same module. With this object we save all required but not yet created
+  // modules.
+  this.isRequired = {};
   this.defineQueue = [];
-  this.processingWaitingForNextTick = false;
+  this.procWaiting = false;
 
   this.Bound = {};
   this.Bound.processDefineQueue = this.processDefineQueue.bind(this);
@@ -74,7 +78,7 @@ _proto.isNodeJs =
  * @this {Minjector}
  */
 _proto.config = function(cfg) {
-  this.cfg = {};
+  this.cfg = {'baseUrl': './'};
 
   if (typeof cfg !== 'object')
     return;
@@ -113,29 +117,79 @@ _proto.define = function(id, dependencies, factory) {
   }
 
   if (typeof factory !== 'function')
-    throw new Error('InvalidArgumentException: Missing factory function.');
+    throw new Error('Require module factory function: ' + id);
 
-  var module = this.cache[id];
-  if (module && !(module instanceof Promise)) {
-    // Testing against is Promise allows modules which defines an id
-    // like there "file id"
-    throw new Error('InvalidStateException: Ambiguous module: ' + id);
+  if (id && this.cache[id]) {
+    throw new Error('Found ambiguous module: ' + id);
   }
 
-  this.defineQueue.push({
+  var module = {
     id: id,
     dependencies: dependencies,
-    factory: factory
-  });
+    factory: factory,
+    ready: false,
+    instance: null,
+    listen: []
+  };
 
-  this.processOnNextTick();
+  if (id)
+    this.cache[id] = module;
+
+  this.defineQueue.push(module);
+
+  // This is necessary for the "entry point"! Somewhere you have to start
+  // using define() and this very first call would just not process.
+  // However all included dependencies will call .processDefineQueue on their
+  // own after including the appropriate file.
+  if (this.procWaiting)
+    return;
+
+  this.procWaiting = true;
+  this.onNextTick(this.Bound.processDefineQueue);
 };
 
 
 /**
- * [createModule description]
- * @param  {object} module Actually all three define(...) params.
- * @return {mixed} The created module or Promise which will create it.
+ * Process all calls to define(...). This is necessary to support multiple
+ * modules in a single file.
+ *
+ * @param {string} id
+ * @this {Minjector}
+ */
+_proto.processDefineQueue = function(id) {
+  this.procWaiting = false;
+  var queue = this.defineQueue;
+  if (queue.length === 0)
+    return;
+
+  // On purpose: Process all define() calls...
+  var module, creatingQueue = [];
+  while (queue.length) {
+    module = queue.pop();
+
+    if (!module.id)
+      module.id = id;
+
+    creatingQueue.push(module);
+  }
+
+  // and then start creating the modules which has been defined.
+  // Because we need to know which modules are in the
+  // current file before starting creating them.
+  while (creatingQueue.length) {
+    module = creatingQueue.pop();
+
+    creationResult = this.createModule(module);
+  }
+};
+
+
+/**
+ * Create the module by resolving all dependencies and executing
+ * the factory function.
+ *
+ * @param  {object} module The object representing the module.
+ * @return {object} The object representing the module.
  * @this {Minjector}
  */
 _proto.createModule = function(module) {
@@ -148,85 +202,104 @@ _proto.createModule = function(module) {
     for (i = 0, l = dependencies.length; i < l; i++) {
       dependencyId = dependencies[i];
 
-      // The dependency might be already defined.
+      // The dependency might be already defined ...
       dependency = this.cache[dependencyId];
-
       if (!dependency) {
-        dependency = this.requireDependencyInContext(dependencyId);
-      }
-
-      // Either the never declared dependency or the knowing but still loading
-      // dependency meight a promise. In either case this module has to wait
-      // for this dependency to be loaded.
-      if (!hasPromise && dependency instanceof Promise)
         hasPromise = true;
+        // ... or is already required and in loading state.
+        dependency = this.isRequired[dependencyId];
+
+        if (!dependency) {
+          dependency = this.requireDependency(dependencyId);
+
+          if (dependency instanceof Promise) {
+            // We need to save the Promise which will create this module some
+            // how. Cause there might come more modules which depends on this
+            // one but have to wait before it is loaded as well. In this case
+            // we dont want to include it again or create a second Promise, but
+            // reuse the existing one.
+            this.isRequired[dependencyId] = dependency;
+          } else {
+            // Since Node.js might be cabable of requiring synchronous
+            // without the need of a Promise.
+            hasPromise = false;
+          }
+
+        }
+
+      } else if (!dependency.ready) {
+        hasPromise = true;
+        dependency = this.listenOnCreation(dependency);
+      } else {
+        dependency = dependency.instance;
+      }
 
       resolvedDependencies.push(dependency);
     }
   }
 
+  // Add this module to the cache now! So that other modules know that this
+  // dependency is in progress of loading / creating.
+  this.cache[module.id] = module;
+
   if (!hasPromise) {
-    // Synchronously process the queue if we are in Node.js and
-    // do not need to use promise cause of synchronous require.
-    // Or there are simply no dependencies to fetch asynchronous.
-    return this.callFactoryCallback(
-        module.id,
-        resolvedDependencies,
-        module.factory
+    // This should be a performance win since we do not create an extra
+    // Promise which resolves immediately.
+    this.callFactoryCallback(
+        module,
+        resolvedDependencies
     );
+  } else {
+    // Create Promise resolving if all dependencies are resolved.
+    module.instance = Promise.all(resolvedDependencies)
+      .then(function(resolvedDependencies) {
+          var _module = module;
+          return this.callFactoryCallback(
+              _module,
+              resolvedDependencies
+          );
+        }.bind(this));
   }
 
-  // Return a promise which waits for all dependencies to finish.
-  // A little bit "tricky" here to return the promise so that
-  // we can and will add another .then() (@see this.requireDependency()
-  // for browsers) to chain async loading recursively.
-  return Promise.all(resolvedDependencies)
-    .then(function(resolvedDependencies) {
-        var _module = module;
-        return this.callFactoryCallback(
-            _module.id,
-            resolvedDependencies,
-            _module.factory
-        );
-      }.bind(this))
-    .catch (function(rejected) {
-        console.log('Error occured: ' + rejected + '\n' + rejected.stack);
-      });
-};
-
-
-/**
- * Execute the factory and add the result to the cache.
- * @param  {string} id
- * @param  {array} resolvedDependencies
- * @param  {function} factory
- * @return {mixed} The created module or Promise which will create it.
- * @this {Minjector}
- */
-_proto.callFactoryCallback = function(id, resolvedDependencies, factory) {
-  var module = factory.apply(null, resolvedDependencies);
-  this.cache[id] = module;
   return module;
 };
 
 
 /**
- * This is actually necessary to support define(...) calls with no id given.
- * These call get the "file id". Therefore we that this id as
- * context to apply if and only if no explicit id is set.
- * However, you should NOT set an id which does not equal to the "file id".
- * Set another explicit id only if you have multiple defines() in a single file.
+ * Execute the module factory function and set the cached module to ready state.
  *
- * @param  {string} id
- * @return {mixed} The created module or Promise which will create it.
+ * @param  {object} module The object representing the module.
+ * @param  {array} resolvedDependencies
+ * @return {mixed} The module object containing creating the executed instance.
  * @this {Minjector}
  */
-_proto.requireDependencyInContext = function(id) {
-  var saveContext = this.contextId;
-  this.contextId = id;
-  var result = this.requireDependency(id);
-  this.contextId = saveContext;
-  return result;
+_proto.callFactoryCallback = function(module, resolvedDependencies) {
+  module.instance = module.factory.apply(null, resolvedDependencies);
+  module.ready = true;
+  delete this.isRequired[module.id];
+
+  var i, l;
+  for (i = 0, l = module.listen.length; i < l; i++) {
+    module.listen[i](module.instance);
+  }
+
+  delete module.listen;
+  return module;
+};
+
+
+/**
+ * Returning a Promise which is listening for the module creation event.
+ * By means of resolving on this very event.
+ * @param  {object} module The object representing the module.
+ * @return {Promise}
+ */
+_proto.listenOnCreation = function(module) {
+  return new Promise(function(resolve, reject) {
+    module.listen.push(function(moduleInstance) {
+      resolve(moduleInstance);
+    });
+  });
 };
 
 
@@ -240,8 +313,24 @@ if (_proto.isNodeJs) {
    * @this {Minjector}
    */
   _proto.requireDependency = function(id) {
+
     require(this.cfg.baseUrl + id);
-    return this.processDefineQueue(id);
+
+    this.processDefineQueue(id);
+
+    var resolvedModule = this.cache[id];
+    if (!resolvedModule.ready) {
+      // The module is not ready but we have to return something
+      // due to Node.js synchronous execution. Therefore return a Promise
+      // resolving after creation, which lets the "parent" module wait either.
+      return new Promise(function(resolve, reject) {
+        resolvedModule.listen.push(function(moduleInstance) {
+          resolve(moduleInstance);
+        });
+      });
+    }
+
+    return resolvedModule.instance;
   };
 
 } else {
@@ -261,20 +350,20 @@ if (_proto.isNodeJs) {
    * @this {Minjector}
    */
   _proto.requireDependency = function(id) {
-    var __this = this;
-    var promiseCreatingModule = new Promise(function(resolve, reject) {
-      var _this = __this;
-
+    return new Promise(function(resolve, reject) {
       var scriptTag = document.createElement('script');
-      scriptTag.src = _this.cfg.baseUrl + id + '.js';
+      scriptTag.src = this.cfg.baseUrl + id + '.js';
       scriptTag.type = 'text/javascript';
       scriptTag.charset = 'utf-8';
       scriptTag._moduleId = id;
 
-      scriptTag.addEventListener('load', function() {
+      scriptTag.addEventListener('load', function(event) {
+        var moduleId = event.target._moduleId;
+
         // Define was called from the loaded script.
         // This event and the execution of the loaded script
-        // happens synchronous.
+        // happens synchronous (Immediately after execution of the loaded
+        // script).
         // Therefore this.defineQueue holds now all the in this
         // loaded script executed define()'s and we want to process them now.
 
@@ -283,93 +372,44 @@ if (_proto.isNodeJs) {
         // this module are reseolved. Then and only then we can create
         // and resolve this module as well. This closes the recursive
         // "Promise / async loading" chain
-        var resolvedModule = _this.processDefineQueue(scriptTag._moduleId);
-        if (resolvedModule instanceof Promise) {
-          resolvedModule.then(function(mymod) {
-            resolve(mymod);
+        this.processDefineQueue(moduleId);
+        var resolvedModule = this.cache[moduleId];
+
+        if (!resolvedModule.ready) {
+          // Since the module is defined but not ready, resolve on
+          // creation event.
+          resolvedModule.listen.push(function(moduleInstance) {
+            resolve(moduleInstance);
           });
+
         } else {
-          // We can resolve immediately if all dependencies are already resolved
-          // or don't need asynchronous loading.
-          resolve(resolvedModule);
+          resolve(resolvedModule.instance);
         }
+      }.bind(this), false);
 
-      }, false);
-
-      _this.domDocumentHead.appendChild(scriptTag);
-    });
-
-    // We need to save the Promise which will create this module in the
-    // cache now. Cause there might come more modules which depends on this one
-    // but have to wait before it is loaded. Therefore we "precaching" the
-    // modules promise and reacting appropriately at all other places.
-    this.cache[id] = promiseCreatingModule;
-    return promiseCreatingModule;
+      this.domDocumentHead.appendChild(scriptTag);
+    }.bind(this));
   };
 }
 
 
-/**
- * Process all calls to define(...). This is necessary to support multiple
- * modules in a single file.
- *
- * @param  {string} moduleId This is the id which comes from the
- * dependency declaration.
- * @return {mixed} The created module or Promise which will create it.
- * @this {Minjector}
- */
-_proto.processDefineQueue = function(moduleId) {
-  var queue = this.defineQueue;
-
-  // On purpose: Process all define() calls...
-  var module, creatingQueue = [];
-  while (queue.length) {
-    module = queue.pop();
-
-    if (!module.id)
-      module.id = moduleId;
-
-    creatingQueue.push(module);
-  }
-
-  this.processingWaitingForNextTick = false;
-
-  // and then start creating the modules which has been defined.
-  // So we do not get confused about the define()'s in the queue and new
-  // incomming ones during module creation and its dependencies.
-  // Because this distinction wouldn't be possible anymore.
-  var resultModule, creationResult;
-  while (creatingQueue.length) {
-    module = creatingQueue.pop();
-
-    creationResult = this.createModule(module);
-    if (module.id === moduleId)
-      resultModule = creationResult;
-  }
-
-  return resultModule;
-};
-
-
-/**
- * This is necessary for Node.js to get all define()'s called in a single file
- * before processing there dependencies. Other wise we would get confused
- * about old define()'s and new one from dependencies.
- * @return {void}
- * @this {Minjector}
- */
-_proto.processOnNextTick = function() {
-  if (this.processingWaitingForNextTick)
-    return;
-
-  this.processingWaitingForNextTick = true;
-
-  if (this.isNodeJs) {
-    process.nextTick(this.Bound.processDefineQueue);
-  } else {
-    window.setTimeout(this.Bound.processDefineQueue, 0);
-  }
-};
+if (_proto.isNodeJs) {
+  /**
+   * Process callback on next tick.
+   * @param  {Function} callback
+   */
+  _proto.onNextTick = function(callback) {
+    process.nextTick(callback);
+  };
+} else {
+  /**
+   * Process callback on next tick.
+   * @param  {Function} callback
+   */
+  _proto.onNextTick = function(callback) {
+    setTimeout(callback, 0);
+  };
+}
 
 
 /**
@@ -381,10 +421,24 @@ _proto.processOnNextTick = function() {
  */
 _proto.require = function(id, callback) {
   if (typeof id === 'string') {
-    return this.cache[id];
+    return this.cache[id].instance;
   } else {
     define.call(this, id, callback);
   }
+};
+
+
+/**
+ * Add instantiated module in ready state to the cache.
+ * @param  {string} id       Module id.
+ * @param  {mixed} instance The result of the modules factory function.
+ * @this {Minjector}
+ */
+_proto.mockModule = function(id, instance) {
+  this.cache[id] = {
+    ready: true,
+    instance: instance
+  };
 };
 
 
@@ -413,3 +467,10 @@ if (_proto.isNodeJs) {
  * @type {function}
  */
 global.define = _proto.define.bind(global.Minjector);
+
+
+/**
+ * Declaring amd environment.
+ * @type {Object}
+ */
+global.define.amd = {};

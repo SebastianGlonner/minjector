@@ -2,7 +2,7 @@ describe('minjector', function() {
   // ATTENTION:
   // This test spec is supposed to run in node AND browser.
 
-  // TODO node-jasmine seams to execute only 1 describe() suite?
+  jasmine.DEFAULT_TIMEOUT_INTERVAL = 2000;
 
   var isNodeJs =
       typeof exports !== 'undefined' && this.exports !== exports;
@@ -21,16 +21,14 @@ describe('minjector', function() {
     });
   }
 
-
   describe('can handle AMD define', function() {
-
     it('and accepts anonymous module', function(done) {
       define(function() {
         done();
       });
     });
 
-    it('with single anonym module', function(done) {
+    it('with single anonym dependency', function(done) {
 
       define(['AnonymModule'], function(AnyModule) {
         expect(typeof AnyModule).toBe('function');
@@ -40,67 +38,108 @@ describe('minjector', function() {
       });
     });
 
-    it('with mulitple anonym modules', function(done) {
-      define(['InvalidModule'], function(AnyModule) {
-        expect(typeof AnyModule).toBe('object');
-        expect(AnyModule.anonym2).toBe(2);
-        done();
-      });
-    });
-
     it('and accepts dependency with id', function(done) {
-      define(['depWithId'], function(AnyModule) {
-        expect(typeof AnyModule).toBe('function');
-        var init = new AnyModule();
+      define(['depWithId'], function(depWithId) {
+        expect(typeof depWithId).toBe('function');
+        var init = new depWithId();
         expect(init.depId()).toBe('depId');
         done();
       });
     });
 
-    it('and accepts file path as module id', function(done) {
-      define(['someModule'], function(someModule) {
-        var initSomeModule = new someModule();
-        expect(initSomeModule.anyAction()).toBe('testAction');
-        done();
+    it('and modules in single file require same dependency', function(done) {
+      define(['single/WeRequire'], function(WeRequire) {
+        expect(typeof WeRequire).toBe('function');
+        var init = new WeRequire();
+        expect(init.weRequire1()).toBe('weRequire1');
+
+        define(['single/WeRequire2'], function(WeRequire2) {
+          expect(typeof WeRequire2).toBe('function');
+          var init = new WeRequire2();
+          expect(init.weRequire2()).toBe('weRequire2');
+
+          if (!isNodeJs) {
+            // To be sure that the "async/Thrid.js"
+            // module was loaded once!
+            var scriptList = document.scripts;
+            var thirdScripts =
+                Array.prototype.filter.call(
+                    scriptList,
+                    function(element) {
+                      return /single\/IamRequired\.js/.test(
+                          element.getAttribute('src')
+                      );
+                    }
+                );
+            expect(thirdScripts.length).toBe(1);
+          }
+
+          done();
+        });
+      });
+    });
+
+    var specName = 'and modules in single file require same dependency' +
+        ' with independent define order';
+    it(specName, function(done) {
+      define(['single/ReverseWeRequire'], function(WeRequire) {
+        expect(typeof WeRequire).toBe('function');
+        var init = new WeRequire();
+        expect(init.weRequire1()).toBe('weRequire1');
+
+        define(['single/ReverseWeRequire2'], function(WeRequire2) {
+          expect(typeof WeRequire2).toBe('function');
+          var init = new WeRequire2();
+          expect(init.weRequire2()).toBe('weRequire2');
+
+          if (!isNodeJs) {
+            // To be sure that the "async/Thrid.js"
+            // module was loaded once!
+            var scriptList = document.scripts;
+            var thirdScripts =
+                Array.prototype.filter.call(
+                    scriptList,
+                    function(element) {
+                      return /single\/ReverseIamRequired\.js/.test(
+                          element.getAttribute('src')
+                      );
+                    }
+                );
+            expect(thirdScripts.length).toBe(1);
+          }
+
+          done();
+        });
       });
     });
 
     it('with mulitple mixed anonym/named modules', function(done) {
-      define(['InvalidModule', 'someModule'], function(AnyModule, someModule) {
-        expect(typeof AnyModule).toBe('object');
-        expect(AnyModule.anonym2).toBe(2);
+      define(['Anonym2', 'Anonym3'], function(Anonym2, Anonym3) {
+        expect(typeof Anonym2).toBe('function');
+        var anonym2 = new Anonym2();
+        expect(anonym2.isAno2()).toBe('isAno2');
 
-        var initSomeModule = new someModule();
-        expect(initSomeModule.anyAction()).toBe('testAction');
-        done();
-      });
-    });
-
-    it('and accepts file path as module id', function(done) {
-      define(['someModule'], function(someModule) {
-        var initSomeModule = new someModule();
-        expect(initSomeModule.anyAction()).toBe('testAction');
+        expect(typeof Anonym3).toBe('function');
+        var anonym3 = new Anonym3();
+        expect(anonym3.isAno3()).toBe('isAno3');
         done();
       });
     });
 
     it('with multiple dependencies in correct order', function(done) {
-      // Third one was never loaded yet
-      // to guarantee a async call (at least in browser)
-      // and no cached loading
       define([
-        'someModule',
-        'thirdModule',
-        'someOtherModule'
-      ], function(someModule, thirdModule, someOtherModule) {
-        var initSomeModule = new someModule();
-        expect(initSomeModule.anyAction()).toBe('testAction');
+        'ordered/First',
+        'ordered/Second',
+        'ordered/Third'
+      ], function(First, Second, Third) {
+        var initFirst = new First();
+        expect(initFirst.firstAction()).toBe('firstAction');
 
-        var initThirdModule = new thirdModule();
-        expect(initThirdModule.thirdAction()).toBe('thirdAction');
+        var initSecond = new Second();
+        expect(initSecond.secondAction()).toBe('secondAction');
 
-        var initSomeOtherModule = new someOtherModule();
-        expect(initSomeOtherModule.anyOtherAction()).toBe('testOtherAction');
+        var initThird = new Third();
+        expect(initThird.thirdAction()).toBe('thirdAction');
 
         done();
       });
@@ -123,6 +162,16 @@ describe('minjector', function() {
       });
     });
 
+    it('and handle unordered define\'s', function(done) {
+
+      define(['RequireNext'], function(RequireNext) {
+        expect(typeof RequireNext).toBe('function');
+        var init = new RequireNext();
+        expect(init.heyhey()).toBe('heyhey_NextInThisFile');
+        done();
+      });
+    });
+
     it('with multiple recursive dependencies', function(done) {
       define([
         'RecursiveModule'
@@ -135,34 +184,55 @@ describe('minjector', function() {
       });
     });
 
+    it('and process all modules absolutely', function(done) {
+      define(['absolute/RelModule'], function(RelModule) {
+        var initRelModule = new RelModule();
+        expect(initRelModule.anyAction()).toBe('rel_relativ');
+        done();
+      });
+    });
+
     it(
         'correctly wait for loading on multiple modules in single file',
         // The special case which we are testing here is that
-        // in "hiddenFirst" file are module are 2 modules "First" and "Second",
+        // in "hidden/First" file are 2 modules "First" and "Second",
         // but the "First" module depends on the "Third" which itself
         // depends on the "Second" module. Which should be in loading
         // state but even though recognized from the "Third" module as
         // "preset" (Do not try to load a file but wait for its completion).
+        // The second module has a simple long loading dependency to
+        // guarantee that the "Second" module is not loaded until we define
+        // the "Third" module and recognize that we need the "Second" module
+        // again.
         function(done) {
-          define([
-            'hidden/First'
-          ], function(First) {
-            expect(typeof First).toBe('function');
-            var first = new First();
-            expect(first.first()).toBe('first_third_second');
+          define(
+              [
+                'hidden/First'
+              ],
+              function(First) {
+                expect(typeof First).toBe('function');
+                var first = new First();
+                expect(first.first()).toBe('first_third_second');
 
-            // To be sure that the "async/Thrid.js" module was loaded once!
-            var scriptList = document.scripts;
-            var thirdScripts = Array.prototype.filter.call(
-                scriptList,
-                function(element) {
-                  return /hidden\/Third\.js/.test(element.getAttribute('src'));
+                if (!isNodeJs) {
+                  // To be sure that the "async/Thrid.js"
+                  // module was loaded once!
+                  var scriptList = document.scripts;
+                  var thirdScripts =
+                      Array.prototype.filter.call(
+                          scriptList,
+                          function(element) {
+                            return /hidden\/Third\.js/.test(
+                                element.getAttribute('src')
+                            );
+                          }
+                      );
+                  expect(thirdScripts.length).toBe(1);
                 }
-           );
-            expect(thirdScripts.length).toBe(1);
 
-            done();
-          });
+                done();
+              }
+          );
         }
     );
 
@@ -186,28 +256,32 @@ describe('minjector', function() {
             var second = new Second();
             expect(second.second()).toBe('second_third');
 
-            // To be sure that the "async/Thrid.js" module was loaded once!
-            var scriptList = document.scripts;
-            var thirdScripts = Array.prototype.filter.call(
-                scriptList,
-                function(element) {
-                  return /async\/Third\.js/.test(element.getAttribute('src'));
-                }
-           );
-            expect(thirdScripts.length).toBe(1);
+            if (!isNodeJs) {
+              // To be sure that the "async/Thrid.js" module was loaded once!
+              var scriptList = document.scripts;
+              var thirdScripts =
+                  Array.prototype.filter.call(
+                      scriptList,
+                      function(element) {
+                        return /async\/Third\.js/
+                          .test(element.getAttribute('src'));
+                      }
+                  );
+              expect(thirdScripts.length).toBe(1);
+            }
 
             done();
           });
         }
     );
 
-    it('can mockup modules for test purpose', function(done) {
+    it('can mockup modules for testing purpose', function(done) {
       var MMM = function() {};
       MMM.prototype.mockupMethod = function() {
         return 'faking behaviour';
       };
 
-      Minjector.cache.MyMockedModule = MMM;
+      Minjector.mockModule('MyMockedModule', MMM);
 
       define(['MyMockedModule'], function(MyMockedModule) {
         expect(typeof MyMockedModule).toBe('function');

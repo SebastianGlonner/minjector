@@ -11,7 +11,7 @@ define(['hidden/Third'], function(Third) {
   return module;
 });
 
-define('hidden/Second', function() {
+define('hidden/Second', ['hidden/SecondDep'], function() {
   var module = function() {
   };
 

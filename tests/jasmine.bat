@@ -1,1 +1,1 @@
-jasmine-node --verbose --forceExit specs
+jasmine-node --verbose --captureExceptions specs/
