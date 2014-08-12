@@ -301,6 +301,129 @@ describe('minjector', function() {
 
   });
 
+  describe('can handle path resolution', function() {
+    it('and normalize "./" correctly', function() {
+      expect(Minjector.normalizePath(
+          '/a/b/',
+          './d',
+          {'id': 'c', 'parent': null}
+          )).toBe('/a/b/d');
+
+      expect(Minjector.normalizePath(
+          '/a/b/',
+          './f/g',
+          {'id': 'c/d/e', 'parent': null}
+          )).toBe('/a/b/c/d/f/g');
+    });
+
+    it('and normalize "../" correctly', function() {
+      expect(Minjector.normalizePath(
+          '/a/b/',
+          '../d',
+          {'id': 'c', 'parent': null}
+          )).toBe('/a/d');
+
+      expect(Minjector.normalizePath(
+          '/a/b/',
+          '../f/g',
+          {'id': 'c/d/e', 'parent': null}
+          )).toBe('/a/b/c/f/g');
+
+      expect(Minjector.normalizePath(
+          '/a/b/',
+          '../../f/g',
+          {'id': 'c/d/e', 'parent': null}
+          )).toBe('/a/b/f/g');
+
+      expect(Minjector.normalizePath(
+          '/a/b/c/d/',
+          '../../f',
+          {'id': 'e', 'parent': null}
+          )).toBe('/a/b/f');
+    });
+
+    it('and handle trailing "/" in path', function() {
+      expect(Minjector.normalizePath(
+          '/a/b/',
+          './f/g/',
+          {'id': 'c/d/e', 'parent': null}
+          )).toBe('/a/b/c/d/f/g');
+    });
+
+    it('and handle trailing "/" in parent module path', function() {
+      expect(Minjector.normalizePath(
+          '/a/b/',
+          './f/g',
+          {'id': 'c/d/e/', 'parent': null}
+          )).toBe('/a/b/c/d/f/g');
+    });
+
+    it('and handle starting "/" in path', function() {
+      expect(Minjector.normalizePath(
+          '/a/b/',
+          '/f/g/',
+          {'id': 'c/d/e', 'parent': null}
+          )).toBe('/a/b/f/g');
+    });
+
+    it('and handle starting "/" in parent module path', function() {
+      expect(Minjector.normalizePath(
+          '/a/b/',
+          './f/g/',
+          {'id': '/c/d/e', 'parent': null}
+          )).toBe('/a/b/c/d/f/g');
+    });
+
+    it('and load modules relative to current', function(done) {
+      define(['relative/IncludeRelative'], function(MyRelModule) {
+        expect(typeof MyRelModule).toBe('function');
+        var mmm = new MyRelModule();
+        expect(mmm.isRelative()).toBe('isRelative_goingRelative');
+        done();
+      });
+    });
+
+    it('and normalize parent path correctly', function() {
+      var parent1 = {'id': './c/d'};
+      var parent2 = {'id': './e/f/g'};
+      var parent3 = {'id': './h'};
+
+      parent3.parent = parent2;
+      parent2.parent = parent1;
+
+      expect(Minjector.normalizePath(
+          '/a/b/',
+          './k',
+          {'id': './i/j', 'parent': parent3}
+          )).toBe('/a/b/c/e/f/i/k');
+    });
+
+    it('and normalize parent path correctly with interrupten', function() {
+      var parent1 = {'id': './c/d'};
+      var parent2 = {'id': './e/f/g'};
+      var parent3 = {'id': 'h'};
+
+      parent3.parent = parent2;
+      parent2.parent = parent1;
+
+      expect(Minjector.normalizePath(
+          '/a/b/',
+          './k',
+          {'id': './i/j', 'parent': parent3}
+          )).toBe('/a/b/i/k');
+    });
+
+    // it('and load modules recursively relative to current', function(done) {
+    //   define(['relative/IncludeRelative2'], function(MyRelModule2) {
+    //     expect(typeof MyRelModule2).toBe('function');
+    //     var mmm = new MyRelModule2();
+    //     expect(mmm.relative2()).toBe('isRelative_goingRelative');
+    //     done();
+    //   });
+    // });
+
+  });
+
   describe('can handle AMD local require', function() {
     it('and load modules asynchronous', function(done) {
       define(['require'], function(require) {

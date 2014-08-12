@@ -9,8 +9,7 @@ minjector
 > Mobile first
 
 * Simplicity! (no support for full AMD spec)
-* Currently, minimized (uglifyjs) less than 3kb size.
-* Absolute id / path resolution
+* Minimized (uglifyjs) about 3.3kb size, gzip about 1.4 kb size.
 * Node.js and Browsers (Chrome, FireFox) support
 
 # Design decisions
@@ -51,18 +50,6 @@ There is no use in handling circular dependencies since it is, in almost
 every case, better coding style to add another module which serves
 as relation for preventing circular dependencies.
 
-__Absolute id/path resolution relative to one configurable base path.__
-
-If you want to change the path or id of a module you will have to change
-this one particular unique id/path everywhere you load the module as dependency
-(this one might be easy due to mostly unique strings which are easy to search
-and replace). Furthermore you have less problems when concatenate or caching
-modules, because the id is unique through its path as well.
-
-The other side, loading modules relative to the current module, would mean you have
-to change code at 2 places throughout the code. Once, as before, everywhere you load
-the module as dependency and all modules you loaded relative to this particular one.
-And you need to normalize id/path to find cached modules.
 
 __No mixed/fallback require in node environments.__
 
@@ -76,6 +63,10 @@ __No support for plugins like suggested in the AMD spec.__
 
 Simplicity, this implementation serves to load JavaScript AMD like modules only.
 
+__No special treatment of '/' starting path__
+
+Like AMD suggests you have relative path resolutions with './' and '../'
+but there is no difference between 'myDir/myMod' and '/myDir/myMod'.
 
 # Examples
 TODO
@@ -102,6 +93,8 @@ Tests implemented with jasmine 2.0. Running in Node.js and Browsers
 
 * Maybe add more "wrong usage" errors and convenience methods. This would be no
   drawback since we planing to add an optimized version.
+
+* Support for loader plugins
 
 # Feedback / Review / Criticism
 I appreciate any kind of feedback!

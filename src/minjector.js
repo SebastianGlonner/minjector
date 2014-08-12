@@ -129,7 +129,8 @@ _proto.define = function(id, dependencies, factory) {
     factory: factory,
     ready: false,
     instance: null,
-    listen: []
+    listen: [],
+    parent: null
   };
 
   if (id)
@@ -156,7 +157,7 @@ _proto.define = function(id, dependencies, factory) {
  * @param {string} id
  * @this {Minjector}
  */
-_proto.processDefineQueue = function(id) {
+_proto.processDefineQueue = function(id, parent) {
   this.procWaiting = false;
   var queue = this.defineQueue;
   if (queue.length === 0)
@@ -166,6 +167,8 @@ _proto.processDefineQueue = function(id) {
   var module, creatingQueue = [];
   while (queue.length) {
     module = queue.pop();
+
+    module.parent = parent;
 
     if (!module.id)
       module.id = id;
@@ -210,7 +213,7 @@ _proto.createModule = function(module) {
         dependency = this.isRequired[dependencyId];
 
         if (!dependency) {
-          dependency = this.requireDependency(dependencyId);
+          dependency = this.requireDependency(dependencyId, module);
 
           if (dependency instanceof Promise) {
             // We need to save the Promise which will create this module some
@@ -312,11 +315,15 @@ if (_proto.isNodeJs) {
    * @return {object|function} The factory result (created module).
    * @this {Minjector}
    */
-  _proto.requireDependency = function(id) {
+  _proto.requireDependency = function(id, parent) {
 
-    require(this.cfg.baseUrl + id);
+    require(this.normalizePath(
+        this.cfg.baseUrl,
+        id,
+        parent
+    ));
 
-    this.processDefineQueue(id);
+    this.processDefineQueue(id, parent);
 
     var resolvedModule = this.cache[id];
     if (!resolvedModule.ready) {
@@ -349,10 +356,14 @@ if (_proto.isNodeJs) {
    * @return {mixed} A Promise which will create the module.
    * @this {Minjector}
    */
-  _proto.requireDependency = function(id) {
+  _proto.requireDependency = function(id, parent) {
     return new Promise(function(resolve, reject) {
       var scriptTag = document.createElement('script');
-      scriptTag.src = this.cfg.baseUrl + id + '.js';
+      scriptTag.src = this.normalizePath(
+          this.cfg.baseUrl,
+          id,
+          parent
+      ) + '.js';
       scriptTag.type = 'text/javascript';
       scriptTag.charset = 'utf-8';
       scriptTag._moduleId = id;
@@ -372,7 +383,7 @@ if (_proto.isNodeJs) {
         // this module are reseolved. Then and only then we can create
         // and resolve this module as well. This closes the recursive
         // "Promise / async loading" chain
-        this.processDefineQueue(moduleId);
+        this.processDefineQueue(moduleId, parent);
         var resolvedModule = this.cache[moduleId];
 
         if (!resolvedModule.ready) {
@@ -391,6 +402,81 @@ if (_proto.isNodeJs) {
     }.bind(this));
   };
 }
+
+
+/**
+ * Normalize a module path. Add all parent modules
+ * in relative cases (path starting with './' or '../').
+ * @param  {string} base   The config.baseUrl.
+ * @param  {string} path   The path/id of the current module.
+ * @param  {object} parent The parent module of the current module.
+ * @return {string}
+ * @this {Minjector}
+ *
+ * @pure
+ */
+_proto.normalizePath = function(base, path, parent) {
+  // Add the current module path to the parent stack for
+  // general path handling issues.
+  parent = {
+    id: path,
+    parent: parent
+  };
+
+  var parentResolution = '', first = true;
+  while (parent) {
+    var parentId = parent.id;
+    if (!parentId)
+      break;
+
+    // Strip starting slahes.
+    if (parentId.charAt(0) === '/')
+      parentId = parentId.substr(1);
+
+    // Strip trailing slahes.
+    if (parentId.charAt(parentId.length - 1) === '/')
+      parentId = parentId.substr(0, parentId.length - 1);
+
+    // We don't want to cut of the module name of the current module!
+    if (first !== true) {
+
+      // Specification says:
+      // '/a/b/c' + './d/e' = '/a/b/d/e'
+      // '/a/b/c' + '../d/e' = '/a/d/e'
+      // Therefore in both cases we need to cut off the actual module name
+      // '/a/b/c' => '/a/b'
+      // '/e' => ''
+      parentId = parentId.substr(0, parentId.lastIndexOf('/') + 1);
+    }
+
+    first = false;
+
+    parentResolution = parentId + parentResolution;
+    if (parentId.charAt(0) !== '.') {
+      // Not relative, therefore break the parent path resolution since
+      // we start from baseUrl in this case and do not care for any more
+      // parents.
+      break;
+    }
+
+    // "Pop stack" of the parent modules
+    parent = parent.parent;
+  }
+
+  var pieces = (base + parentResolution).split('/');
+
+  var res = [], piece, i, l;
+  for (i = 0, l = pieces.length; i < l; i++) {
+    piece = pieces[i];
+    if (piece === '.') {
+
+    } else if (piece === '..') {
+      res.pop();
+    } else
+      res.push(piece);
+  }
+  return res.join('/');
+};
 
 
 if (_proto.isNodeJs) {
