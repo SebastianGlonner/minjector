@@ -15,9 +15,9 @@ minjector
 # Design decisions
 > to best serve the mobile first goal.
 
-__No parsing of the function body parsing__
+__No parsing of the function body__
 
-In my personal opition there is absolutely no point in parsing
+In my personal opinion there is no point in parsing
 the function.toString() and searching for
 "var a = require('a');" things. And since this is freaking useless
 performance overkill for convenience, i like the approach of just proper
