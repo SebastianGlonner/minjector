@@ -24,6 +24,8 @@
  */
 
 
+"use strict";
+
 
 /**
  * Constructor class.
@@ -180,9 +182,7 @@ _proto.processDefineQueue = function(id, parent) {
   // Because we need to know which modules are in the
   // current file before starting creating them.
   while (creatingQueue.length) {
-    module = creatingQueue.pop();
-
-    creationResult = this.createModule(module);
+    this.createModule(creatingQueue.pop());
   }
 };
 
@@ -261,7 +261,9 @@ _proto.createModule = function(module) {
               _module,
               resolvedDependencies
           );
-        }.bind(this));
+        }.bind(this)).catch(function(e) {
+          console.error(e.stack);
+        });
   }
 
   return module;

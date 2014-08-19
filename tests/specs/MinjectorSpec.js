@@ -471,4 +471,15 @@ describe('minjector', function() {
     });
   });
 
+  describe('can handle usability errors', function() {
+    it('and usefully handles errors inside a factory function', function(done) {
+      var count = 0;
+      spyOn(console, 'error').and.callFake(function() {
+        done();
+      }); //.and.callThrough();
+      define(['errors/ErrorModule'], function() {
+        // ...
+      });
+    });
+  });
 });
