@@ -1,4 +1,4 @@
-define(['single/IamRequired'], function() {
+define(['/single/IamRequired'], function() {
   var module = function() {
   };
 
@@ -9,7 +9,7 @@ define(['single/IamRequired'], function() {
   return module;
 });
 
-define('single/WeRequire2', ['single/IamRequired'], function() {
+define('/single/WeRequire2', ['/single/IamRequired'], function() {
   var module = function() {
   };
 

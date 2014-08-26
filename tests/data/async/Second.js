@@ -1,4 +1,4 @@
-define(['async/Third'], function(Third) {
+define(['/async/Third'], function(Third) {
   var module = function() {
   };
 

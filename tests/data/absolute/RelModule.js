@@ -1,4 +1,4 @@
-define(['RootPathModule'], function(RootPathModule) {
+define(['/RootPathModule'], function(RootPathModule) {
   var module = function() {
   };
 

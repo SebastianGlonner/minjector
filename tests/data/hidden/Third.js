@@ -1,4 +1,4 @@
-define(['hidden/Second'], function(Second) {
+define(['/hidden/Second'], function(Second) {
   var module = function() {
   };
 

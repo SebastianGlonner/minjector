@@ -63,14 +63,6 @@ __No support for plugins like suggested in the AMD spec.__
 
 Simplicity, this implementation serves to load JavaScript AMD like modules only.
 
-__No special treatment of '/' starting path__
-
-Like AMD suggests you have relative path resolutions with './' and '../'
-but there is no difference between 'myDir/myMod' and '/myDir/myMod'.
-
-# Examples
-TODO
-
 # Tests
 * [Jasmine (Node.js implementation)](https://github.com/pivotal/jasmine)
 * [Jasmine (Browser implementation)](http://jasmine.github.io/2.0/introduction.html)

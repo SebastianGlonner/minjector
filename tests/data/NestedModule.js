@@ -1,5 +1,5 @@
 define(
-  ['nested/RecursiveModule'],
+  ['/nested/RecursiveModule'],
   // ['NestedRecursiveModule'],
 
   function(RecursiveModule) {

@@ -1,5 +1,5 @@
 
-define(['NextInThisFile'], function(NextInThisFile) {
+define(['/NextInThisFile'], function(NextInThisFile) {
   var module = function() {
   };
 
@@ -12,7 +12,7 @@ define(['NextInThisFile'], function(NextInThisFile) {
   return module;
 });
 
-define('NextInThisFile', function() {
+define('/NextInThisFile', function() {
   var module = function() {
   };
 

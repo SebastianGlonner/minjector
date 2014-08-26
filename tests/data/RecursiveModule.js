@@ -1,5 +1,5 @@
 define(
-    ['recursive/Recursive1'],
+    ['/recursive/Recursive1'],
     function(RecursiveModule) {
       var module = function() {
       };

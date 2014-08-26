@@ -24,7 +24,17 @@
  */
 
 
-"use strict";
+'use strict';
+
+
+/* global Promise */
+/* global window */
+/* global document */
+/* global GLOBAL */
+/* global require */
+/* global exports */
+/* global console */
+
 
 
 /**
@@ -80,7 +90,10 @@ _proto.isNodeJs =
  * @this {Minjector}
  */
 _proto.config = function(cfg) {
-  this.cfg = {'baseUrl': './'};
+  this.cfg = {
+    'baseUrl': './',
+    'libUrl' : './'
+  };
 
   if (typeof cfg !== 'object')
     return;
@@ -157,6 +170,7 @@ _proto.define = function(id, dependencies, factory) {
  * modules in a single file.
  *
  * @param {string} id
+ * @param {object} parent The parent module of defined id.
  * @this {Minjector}
  */
 _proto.processDefineQueue = function(id, parent) {
@@ -196,6 +210,7 @@ _proto.processDefineQueue = function(id, parent) {
  * @this {Minjector}
  */
 _proto.createModule = function(module) {
+  // console.log(module);
   var dependencies = module.dependencies;
 
   var resolvedDependencies = [];
@@ -261,7 +276,8 @@ _proto.createModule = function(module) {
               _module,
               resolvedDependencies
           );
-        }.bind(this)).catch(function(e) {
+        }.bind(this),
+        function(e) {
           console.error(e.stack);
         });
   }
@@ -314,16 +330,12 @@ if (_proto.isNodeJs) {
    * "Node.js" is using native "require" for inclucion.
    *
    * @param  {string} id Id of the dependency/module to require.
+   * @param {object} parent The parent module of defined id.
    * @return {object|function} The factory result (created module).
    * @this {Minjector}
    */
   _proto.requireDependency = function(id, parent) {
-
-    require(this.normalizePath(
-        this.cfg.baseUrl,
-        id,
-        parent
-    ));
+    require(this.createPath(id, parent));
 
     this.processDefineQueue(id, parent);
 
@@ -355,17 +367,14 @@ if (_proto.isNodeJs) {
    * "DOM" implementation.
    *
    * @param  {string} id Id of the dependency/module to require.
+   * @param {object} parent The parent module of defined id.
    * @return {mixed} A Promise which will create the module.
    * @this {Minjector}
    */
   _proto.requireDependency = function(id, parent) {
     return new Promise(function(resolve, reject) {
       var scriptTag = document.createElement('script');
-      scriptTag.src = this.normalizePath(
-          this.cfg.baseUrl,
-          id,
-          parent
-      ) + '.js';
+      scriptTag.src = this.createPath(id, parent) + '.js';
       scriptTag.type = 'text/javascript';
       scriptTag.charset = 'utf-8';
       scriptTag._moduleId = id;
@@ -404,6 +413,30 @@ if (_proto.isNodeJs) {
     }.bind(this));
   };
 }
+
+
+/**
+ * Create the path for an module by its id. Thereby reacting on the
+ * id starting. Starting not with '/' or '.' requiring it from the lib
+ * directory.
+ *
+ * @param  {string} id Id of the dependency/module to require.
+ * @param {object} parent The parent module of defined id.
+ * @return {string}
+ * @this {Minjector}
+ */
+_proto.createPath = function(id, parent) {
+  var fc = id.charAt(0);
+  if (fc === '.' || fc === '/') {
+    return this.normalizePath(
+        this.cfg.baseUrl,
+        id,
+        parent
+    );
+  } else {
+    return this.cfg.libUrl + id;
+  }
+};
 
 
 /**
@@ -495,7 +528,7 @@ if (_proto.isNodeJs) {
    * @param  {Function} callback
    */
   _proto.onNextTick = function(callback) {
-    setTimeout(callback, 0);
+    window.setTimeout(callback, 0);
   };
 }
 
@@ -511,7 +544,7 @@ _proto.require = function(id, callback) {
   if (typeof id === 'string') {
     return this.cache[id].instance;
   } else {
-    define.call(this, id, callback);
+    this.define.call(this, id, callback);
   }
 };
 
@@ -538,7 +571,7 @@ if (_proto.isNodeJs) {
    * Enviroment specific global instantiation.
    * @type {MinjectorClass}
    */
-  global.Minjector = new MinjectorClass({base: process.cwd()});
+  global.Minjector = new MinjectorClass();
 } else {
   global = window;
 
@@ -546,7 +579,7 @@ if (_proto.isNodeJs) {
    * Enviroment specific global instantiation.
    * @type {MinjectorClass}
    */
-  global.Minjector = new MinjectorClass({base: './'});
+  global.Minjector = new MinjectorClass();
 }
 
 

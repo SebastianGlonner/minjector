@@ -3,7 +3,7 @@ define(function() {
   return {iamAsync: 'hmmm'};
 });
 
-define('CanBeRequiredSync', function() {
+define('/CanBeRequiredSync', function() {
 
   return {iamSync: 'yes'};
 });

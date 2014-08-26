@@ -9,15 +9,17 @@ describe('minjector', function() {
 
   if (isNodeJs) {
     var config = require(process.cwd() + '/bootstrap.node.js');
-    require(config.DIR.BIN + 'minjector');
+    require(config.DIR.SRC + 'minjector');
 
     Minjector.config({
-      baseUrl: config.DIR.TESTS_DATA
+      baseUrl: config.DIR.TESTS_DATA,
+      libUrl: config.DIR.TESTS_DATA + 'lib/'
     });
   } else {
     // The minjector library will be loaded in the HTML spec file.
     Minjector.config({
-      baseUrl: './data/'
+      baseUrl: './data/',
+      libUrl: './data/lib/'
     });
   }
 
@@ -30,7 +32,7 @@ describe('minjector', function() {
 
     it('with single anonym dependency', function(done) {
 
-      define(['AnonymModule'], function(AnyModule) {
+      define(['/AnonymModule'], function(AnyModule) {
         expect(typeof AnyModule).toBe('function');
         var init = new AnyModule();
         expect(init.isAno()).toBe('isAno');
@@ -39,7 +41,7 @@ describe('minjector', function() {
     });
 
     it('and accepts dependency with id', function(done) {
-      define(['depWithId'], function(depWithId) {
+      define(['/depWithId'], function(depWithId) {
         expect(typeof depWithId).toBe('function');
         var init = new depWithId();
         expect(init.depId()).toBe('depId');
@@ -48,12 +50,12 @@ describe('minjector', function() {
     });
 
     it('and modules in single file require same dependency', function(done) {
-      define(['single/WeRequire'], function(WeRequire) {
+      define(['/single/WeRequire'], function(WeRequire) {
         expect(typeof WeRequire).toBe('function');
         var init = new WeRequire();
         expect(init.weRequire1()).toBe('weRequire1');
 
-        define(['single/WeRequire2'], function(WeRequire2) {
+        define(['/single/WeRequire2'], function(WeRequire2) {
           expect(typeof WeRequire2).toBe('function');
           var init = new WeRequire2();
           expect(init.weRequire2()).toBe('weRequire2');
@@ -82,12 +84,12 @@ describe('minjector', function() {
     var specName = 'and modules in single file require same dependency' +
         ' with independent define order';
     it(specName, function(done) {
-      define(['single/ReverseWeRequire'], function(WeRequire) {
+      define(['/single/ReverseWeRequire'], function(WeRequire) {
         expect(typeof WeRequire).toBe('function');
         var init = new WeRequire();
         expect(init.weRequire1()).toBe('weRequire1');
 
-        define(['single/ReverseWeRequire2'], function(WeRequire2) {
+        define(['/single/ReverseWeRequire2'], function(WeRequire2) {
           expect(typeof WeRequire2).toBe('function');
           var init = new WeRequire2();
           expect(init.weRequire2()).toBe('weRequire2');
@@ -114,7 +116,7 @@ describe('minjector', function() {
     });
 
     it('with mulitple mixed anonym/named modules', function(done) {
-      define(['Anonym2', 'Anonym3'], function(Anonym2, Anonym3) {
+      define(['/Anonym2', '/Anonym3'], function(Anonym2, Anonym3) {
         expect(typeof Anonym2).toBe('function');
         var anonym2 = new Anonym2();
         expect(anonym2.isAno2()).toBe('isAno2');
@@ -128,9 +130,9 @@ describe('minjector', function() {
 
     it('with multiple dependencies in correct order', function(done) {
       define([
-        'ordered/First',
-        'ordered/Second',
-        'ordered/Third'
+        '/ordered/First',
+        '/ordered/Second',
+        '/ordered/Third'
       ], function(First, Second, Third) {
         var initFirst = new First();
         expect(initFirst.firstAction()).toBe('firstAction');
@@ -147,7 +149,7 @@ describe('minjector', function() {
 
     it('with nested dependencies', function(done) {
       define([
-        'NestedModule'
+        '/NestedModule'
       ], function(NestedModule) {
         expect(typeof NestedModule).toBe('function');
         var nested = new NestedModule();
@@ -164,7 +166,7 @@ describe('minjector', function() {
 
     it('and handle unordered define\'s', function(done) {
 
-      define(['RequireNext'], function(RequireNext) {
+      define(['/RequireNext'], function(RequireNext) {
         expect(typeof RequireNext).toBe('function');
         var init = new RequireNext();
         expect(init.heyhey()).toBe('heyhey_NextInThisFile');
@@ -174,7 +176,7 @@ describe('minjector', function() {
 
     it('with multiple recursive dependencies', function(done) {
       define([
-        'RecursiveModule'
+        '/RecursiveModule'
       ], function(RecursiveModule) {
         expect(typeof RecursiveModule).toBe('function');
         var rec = new RecursiveModule();
@@ -185,7 +187,7 @@ describe('minjector', function() {
     });
 
     it('and process all modules absolutely', function(done) {
-      define(['absolute/RelModule'], function(RelModule) {
+      define(['/absolute/RelModule'], function(RelModule) {
         var initRelModule = new RelModule();
         expect(initRelModule.anyAction()).toBe('rel_relativ');
         done();
@@ -207,7 +209,7 @@ describe('minjector', function() {
         function(done) {
           define(
               [
-                'hidden/First'
+                '/hidden/First'
               ],
               function(First) {
                 expect(typeof First).toBe('function');
@@ -244,8 +246,8 @@ describe('minjector', function() {
         // file.
         function(done) {
           define([
-            'async/First',
-            'async/Second'
+            '/async/First',
+            '/async/Second'
           ],
           function(First, Second) {
             expect(typeof First).toBe('function');
@@ -281,9 +283,9 @@ describe('minjector', function() {
         return 'faking behaviour';
       };
 
-      Minjector.mockModule('MyMockedModule', MMM);
+      Minjector.mockModule('/MyMockedModule', MMM);
 
-      define(['MyMockedModule'], function(MyMockedModule) {
+      define(['/MyMockedModule'], function(MyMockedModule) {
         expect(typeof MyMockedModule).toBe('function');
         var mmm = new MyMockedModule();
         expect(mmm.mockupMethod()).toBe('faking behaviour');
@@ -292,7 +294,7 @@ describe('minjector', function() {
     });
 
     it('and handle multiple anonym modules in single file', function(done) {
-      define(['OverwriteModule'], function(OverwriteModule) {
+      define(['/OverwriteModule'], function(OverwriteModule) {
         expect(typeof OverwriteModule).toBe('object');
         expect(OverwriteModule.anonym2).toBe(2);
         done();
@@ -375,7 +377,7 @@ describe('minjector', function() {
     });
 
     it('and load modules relative to current', function(done) {
-      define(['relative/IncludeRelative'], function(MyRelModule) {
+      define(['/relative/IncludeRelative'], function(MyRelModule) {
         expect(typeof MyRelModule).toBe('function');
         var mmm = new MyRelModule();
         expect(mmm.isRelative()).toBe('isRelative_goingRelative');
@@ -413,14 +415,16 @@ describe('minjector', function() {
           )).toBe('/a/b/i/k');
     });
 
-    // it('and load modules recursively relative to current', function(done) {
-    //   define(['relative/IncludeRelative2'], function(MyRelModule2) {
-    //     expect(typeof MyRelModule2).toBe('function');
-    //     var mmm = new MyRelModule2();
-    //     expect(mmm.relative2()).toBe('isRelative_goingRelative');
-    //     done();
-    //   });
-    // });
+    it('and load modules recursively relative to current', function(done) {
+      define(['/relative/IncludeRelative2'], function(MyRelModule2) {
+        expect(typeof MyRelModule2).toBe('function');
+        var mmm = new MyRelModule2();
+        expect(mmm.relative2()).toBe(
+            'isRelative2_TrulyAbs1_TrulyRelative1_TrulyRelative2'
+        );
+        done();
+      });
+    });
 
   });
 
@@ -429,7 +433,7 @@ describe('minjector', function() {
       define(['require'], function(require) {
         expect(typeof require).toBe('function');
 
-        require(['RequiredModule'], function(RequiredModule) {
+        require(['/RequiredModule'], function(RequiredModule) {
           expect(typeof RequiredModule).toBe('object');
           expect(RequiredModule.justRequired).toBe('AMD');
           done();
@@ -443,8 +447,8 @@ describe('minjector', function() {
     // the first one. But we definitely want to start load all dependencies
     // immediately.
     // ... continue on next it(...).
-    xit('and handle stupid dependency order (SKIPPED)', function(done) {
-      define(['MixedModule', 'MixedId'], function(MixedModule, MixedId) {
+    xit('and handle stupid dependency order', function(done) {
+      define(['/MixedModule', '/MixedId'], function(MixedModule, MixedId) {
         expect(typeof MixedModule).toBe('object');
         expect(MixedModule.anonym1).toBe(1);
 
@@ -459,11 +463,11 @@ describe('minjector', function() {
     // which is a synchronous call by definition of the AMD spec and just
     // will/has to fail if the dependency is not available synchronously.
     it('and handle synchronous require() calls', function(done) {
-      define(['require', 'SyncRequireModule'], function(require, SRModule) {
+      define(['require', '/SyncRequireModule'], function(require, SRModule) {
         expect(typeof require).toBe('function');
         expect(typeof SRModule).toBe('object');
 
-        var SR2Module = require('CanBeRequiredSync');
+        var SR2Module = require('/CanBeRequiredSync');
         expect(typeof SR2Module).toBe('object');
         expect(SR2Module.iamSync).toBe('yes');
         done();
@@ -477,8 +481,19 @@ describe('minjector', function() {
       spyOn(console, 'error').and.callFake(function() {
         done();
       }); //.and.callThrough();
-      define(['errors/ErrorModule'], function() {
+      define(['/errors/ErrorModule'], function() {
         // ...
+      });
+    });
+  });
+
+  describe('can handle a libUrl configuration', function() {
+    it('and correctly includes modules from lib', function(done) {
+      define(['LibModule'], function(LibModule) {
+        console.log('well');
+        expect(typeof LibModule).toBe('object');
+        expect(LibModule.libMethod()).toBe('yei');
+        done();
       });
     });
   });

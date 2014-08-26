@@ -1,4 +1,4 @@
-define('depWithId', function() {
+define('/depWithId', function() {
   var module = function() {
   };
 

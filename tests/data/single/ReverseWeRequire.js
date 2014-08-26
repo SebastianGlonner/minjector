@@ -1,4 +1,4 @@
-define('single/ReverseWeRequire2', ['single/ReverseIamRequired'], function() {
+define('/single/ReverseWeRequire2', ['/single/ReverseIamRequired'], function() {
   var module = function() {
   };
 
@@ -9,7 +9,7 @@ define('single/ReverseWeRequire2', ['single/ReverseIamRequired'], function() {
   return module;
 });
 
-define(['single/ReverseIamRequired'], function() {
+define(['/single/ReverseIamRequired'], function() {
   var module = function() {
   };
 
