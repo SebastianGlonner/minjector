@@ -2,15 +2,100 @@ minjector
 =========
 
 ## Minjector implements an AMD like module loader for browsers and Node.js.
+Truly Node.js does not require an AMD loader. Despite of this it is supported
+to allow writing modules which are required in browsers and Nodes.js. The
+performance drawback for Node.js is not to much since all modules still get
+included synchronously. You just get littel overhead through .onNextTicke()
+which you might want to consider if you require to save every single
+millisecond.
 
+You dont know what an AMD loader is:
 [AMD Specification](https://github.com/amdjs/amdjs-api/blob/master/AMD.md)
 
-# Why / Goals
+You dont know why you should use an AMD loader:
+Checkout excellent page:
+[requirejs](http://requirejs.org/docs/whyamd.html)
+
+# Why reimplementing this despite of their exists requirejs and co.?
 > Mobile first
 
 * Simplicity! (no support for full AMD spec)
 * Minimized (uglifyjs) about 3.3kb size, gzip about 1.4 kb size.
 * Node.js and Browsers (Chrome, FireFox) support
+
+# Config
+
+> libUrl
+
+All modules which start NOT with '/' or '.' will be required relative to this
+directory!
+Inspired from requirejs and acting like Node.js, this is the lib directory
+where you want to put modules/libraries like e. g. jQuery.
+
+> baseUrl
+
+All modules which start with '/' or '.' will be required relative to this
+directory!
+
+# Dont's you want to know
+* Do NOT require a module which has no module defined
+* Do NOT require a module where you set explicity another id for the module
+than the required path
+```
+define(['/my/module'], ...);
+```
+```
+define('/my/module_differs', [...], ...)
+```
+
+* EACH character of the module id / path matters
+'/my/module' !== 'my/module'
+
+* Do not require 2 modules which are in the same file like:
+```
+define(['/my/module1', '/my/module2'], ...);
+```
+```
+define('/my/module1', ...);
+
+define('/my/module2', ...);
+```
+The implementation immediately tries to load a file define '/my/module2' because
+we do not wait for files to be included to check if the required dependency is
+in their (performance nonesense).
+
+# Extensive Examples
+
+Suggesting the following directory structure
+```
+- myApp
+    |- modules
+    |   |- home
+    |   |   |- controller.js
+    |   |   |- model.js
+    |   |- base.controller.js
+    |   |- base.model.js
+    |- lib
+    |   |- minjector.js
+    |   |- jquery.js
+    |- index.js
+    |- index.html
+```
+
+You want to configure Minjector in the index.(js|html) like:
+```
+// Browser
+Minjector.config({
+  baseUrl: './',
+  libUrl: './lib/'
+});
+
+// Node.js
+Minjector.config({
+  baseUrl: __dirname + '/',
+  libUrl: __dirname + '/lib/'
+});
+```
 
 # Design decisions
 > to best serve the mobile first goal.
@@ -34,6 +119,7 @@ define(['SomeFile'], function() {
 where SomeFile.js contains something like:
 ```
 var POLLUTING_GLOBAL_NAMESPACE = 'is no good coding style';
+/* and no more code */
 ```
 Since we are encouraged and want to use the "Module Pattern" we do not
 introduce possibilities to workaround this by extra code. If you load a
