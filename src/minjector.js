@@ -276,8 +276,8 @@ _proto.createModule = function(module) {
               _module,
               resolvedDependencies
           );
-        }.bind(this),
-        function(e) {
+        }.bind(this))
+      .catch (function(e) {
           console.error(e.stack);
         });
   }
