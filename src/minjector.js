@@ -210,7 +210,6 @@ _proto.processDefineQueue = function(id, parent) {
  * @this {Minjector}
  */
 _proto.createModule = function(module) {
-  // console.log(module);
   var dependencies = module.dependencies;
 
   var resolvedDependencies = [];
@@ -498,19 +497,27 @@ _proto.normalizePath = function(base, path, parent) {
     parent = parent.parent;
   }
 
-  var pieces = (base + parentResolution).split('/');
+  var pieces = base + parentResolution;
+  var isStartingSlash = base.charAt(0) === '/';
+  pieces = (isStartingSlash ? pieces.substr(1) : pieces).split('/');
 
-  var res = [], piece, i, l;
+  var res = [], piece, i, l, outside = 0;
   for (i = 0, l = pieces.length; i < l; i++) {
     piece = pieces[i];
     if (piece === '.') {
 
     } else if (piece === '..') {
-      res.pop();
+      if (res.length > outside)
+        res.pop();
+      else {
+        res.push(piece);
+        outside++;
+      }
+
     } else
       res.push(piece);
   }
-  return res.join('/');
+  return (isStartingSlash ? '/' : '') + res.join('/');
 };
 
 

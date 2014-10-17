@@ -415,6 +415,35 @@ describe('minjector', function() {
           )).toBe('/a/b/i/k');
     });
 
+    it('do not cut /../ into nothing, allowing to use pahts above the' +
+        'absolute root e.g. "./my/../../path" => "../path"',
+        function() {
+          expect(Minjector.normalizePath(
+              'a/b/',
+              '../../../d',
+              null
+              )).toBe('../d');
+
+          expect(Minjector.normalizePath(
+              '/a/b/',
+              '../../../d',
+              null
+              )).toBe('/../d');
+
+          expect(Minjector.normalizePath(
+              '/a/b/',
+              '../../../c/d/../..',
+              null
+              )).toBe('/..');
+
+          expect(Minjector.normalizePath(
+              '/a/b/',
+              '../../../c/d/../../..',
+              null
+              )).toBe('/../..');
+        }
+    );
+
     it('and load modules recursively relative to current', function(done) {
       define(['/relative/IncludeRelative2'], function(MyRelModule2) {
         expect(typeof MyRelModule2).toBe('function');
