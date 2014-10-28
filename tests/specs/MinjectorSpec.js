@@ -9,19 +9,34 @@ describe('minjector', function() {
 
   if (isNodeJs) {
     var config = require(process.cwd() + '/bootstrap.node.js');
-    require(config.DIR.SRC + 'minjector');
-
-    Minjector.config({
-      baseUrl: config.DIR.TESTS_DATA,
-      libUrl: config.DIR.TESTS_DATA + 'lib/'
-    });
-  } else {
-    // The minjector library will be loaded in the HTML spec file.
-    Minjector.config({
-      baseUrl: './data/',
-      libUrl: './data/lib/'
-    });
+    require(config.DIR.BIN + 'minjector');
   }
+
+  beforeEach(function() {
+    if (isNodeJs) {
+      Minjector.config({
+        baseUrl: config.DIR.TESTS_DATA,
+        libUrl: config.DIR.TESTS_DATA + 'lib/'
+      });
+    } else {
+      // The minjector library will be loaded in the HTML spec file.
+      Minjector.config({
+        baseUrl: './data/',
+        libUrl: './data/lib/',
+        map: {
+          'WantMappedModules': {
+            '/MapModule': '/mapped/mapit'
+          },
+          '/MapModule': {
+            'getMapped2': '/mapped/recmap'
+          },
+          'LibMappedModules': {
+            'MapToLibModule': 'MappedInLib'
+          }
+        }
+      });
+    }
+  });
 
   describe('can handle AMD define', function() {
     it('and accepts anonymous module', function(done) {
@@ -303,86 +318,50 @@ describe('minjector', function() {
 
   });
 
-  describe('can handle path resolution', function() {
+  describe('can handle path normalization', function() {
     it('and normalize "./" correctly', function() {
-      expect(Minjector.normalizePath(
-          '/a/b/',
+      Minjector.config({'baseUrl': '/a/b/'});
+      expect(Minjector.createPath(
           './d',
-          {'id': 'c', 'parent': null}
+          {'id': './c', 'parent': null}
           )).toBe('/a/b/d');
 
-      expect(Minjector.normalizePath(
-          '/a/b/',
+      expect(Minjector.createPath(
           './f/g',
-          {'id': 'c/d/e', 'parent': null}
+          {'id': './c/d/e', 'parent': null}
           )).toBe('/a/b/c/d/f/g');
     });
 
     it('and normalize "../" correctly', function() {
-      expect(Minjector.normalizePath(
-          '/a/b/',
+      Minjector.config({'baseUrl': '/a/b/'});
+      expect(Minjector.createPath(
           '../d',
-          {'id': 'c', 'parent': null}
+          {'id': './c', 'parent': null}
           )).toBe('/a/d');
 
-      expect(Minjector.normalizePath(
-          '/a/b/',
+      expect(Minjector.createPath(
           '../f/g',
-          {'id': 'c/d/e', 'parent': null}
+          {'id': './c/d/e', 'parent': null}
           )).toBe('/a/b/c/f/g');
 
-      expect(Minjector.normalizePath(
-          '/a/b/',
+      expect(Minjector.createPath(
           '../../f/g',
-          {'id': 'c/d/e', 'parent': null}
+          {'id': './c/d/e', 'parent': null}
           )).toBe('/a/b/f/g');
 
-      expect(Minjector.normalizePath(
-          '/a/b/c/d/',
+      Minjector.config({'baseUrl': '/a/b/c/d/'});
+      expect(Minjector.createPath(
           '../../f',
           {'id': 'e', 'parent': null}
           )).toBe('/a/b/f');
     });
 
-    it('and handle trailing "/" in path', function() {
-      expect(Minjector.normalizePath(
-          '/a/b/',
-          './f/g/',
-          {'id': 'c/d/e', 'parent': null}
-          )).toBe('/a/b/c/d/f/g');
-    });
-
-    it('and handle trailing "/" in parent module path', function() {
-      expect(Minjector.normalizePath(
-          '/a/b/',
-          './f/g',
-          {'id': 'c/d/e/', 'parent': null}
-          )).toBe('/a/b/c/d/f/g');
-    });
-
     it('and handle starting "/" in path', function() {
-      expect(Minjector.normalizePath(
-          '/a/b/',
-          '/f/g/',
+      Minjector.config({'baseUrl': '/a/b/'});
+      expect(Minjector.createPath(
+          '/f/g',
           {'id': 'c/d/e', 'parent': null}
           )).toBe('/a/b/f/g');
-    });
-
-    it('and handle starting "/" in parent module path', function() {
-      expect(Minjector.normalizePath(
-          '/a/b/',
-          './f/g/',
-          {'id': '/c/d/e', 'parent': null}
-          )).toBe('/a/b/c/d/f/g');
-    });
-
-    it('and load modules relative to current', function(done) {
-      define(['/relative/IncludeRelative'], function(MyRelModule) {
-        expect(typeof MyRelModule).toBe('function');
-        var mmm = new MyRelModule();
-        expect(mmm.isRelative()).toBe('isRelative_goingRelative');
-        done();
-      });
     });
 
     it('and normalize parent path correctly', function() {
@@ -393,8 +372,8 @@ describe('minjector', function() {
       parent3.parent = parent2;
       parent2.parent = parent1;
 
-      expect(Minjector.normalizePath(
-          '/a/b/',
+      Minjector.config({'baseUrl': '/a/b/'});
+      expect(Minjector.createPath(
           './k',
           {'id': './i/j', 'parent': parent3}
           )).toBe('/a/b/c/e/f/i/k');
@@ -403,13 +382,13 @@ describe('minjector', function() {
     it('and normalize parent path correctly with interrupten', function() {
       var parent1 = {'id': './c/d'};
       var parent2 = {'id': './e/f/g'};
-      var parent3 = {'id': 'h'};
+      var parent3 = {'id': '/h'};
 
       parent3.parent = parent2;
       parent2.parent = parent1;
 
-      expect(Minjector.normalizePath(
-          '/a/b/',
+      Minjector.config({'baseUrl': '/a/b/'});
+      expect(Minjector.createPath(
           './k',
           {'id': './i/j', 'parent': parent3}
           )).toBe('/a/b/i/k');
@@ -444,6 +423,19 @@ describe('minjector', function() {
         }
     );
 
+  });
+
+  describe('can handle absolute and relative path resolution', function() {
+
+    it('and load modules relative to current', function(done) {
+      define(['/relative/IncludeRelative'], function(MyRelModule) {
+        expect(typeof MyRelModule).toBe('function');
+        var mmm = new MyRelModule();
+        expect(mmm.isRelative()).toBe('isRelative_goingRelative');
+        done();
+      });
+    });
+
     it('and load modules recursively relative to current', function(done) {
       define(['/relative/IncludeRelative2'], function(MyRelModule2) {
         expect(typeof MyRelModule2).toBe('function');
@@ -454,7 +446,6 @@ describe('minjector', function() {
         done();
       });
     });
-
   });
 
   describe('can handle AMD local require', function() {
@@ -515,12 +506,35 @@ describe('minjector', function() {
     });
   });
 
-  describe('can handle a libUrl configuration', function() {
+  describe('can handle a "libUrl" config param', function() {
     it('and correctly includes modules from lib', function(done) {
       define(['LibModule'], function(LibModule) {
-        console.log('well');
         expect(typeof LibModule).toBe('object');
         expect(LibModule.libMethod()).toBe('yei');
+        done();
+      });
+    });
+  });
+
+  describe('can handle a "map" config param', function() {
+    it('and correctly mappging basic modules', function(done) {
+      // This tests also that the module id remains and will not change
+      // to the mapped name
+      define('WantMappedModules', ['/MapModule'], function(MapModule) {
+        expect(typeof MapModule).toBe('function');
+        var obj = new MapModule();
+        expect(obj.toString()).toBe('is_mapped_rec_mapped');
+        done();
+      });
+    });
+
+    it('and correctly mappging lib modules', function(done) {
+      // This tests also that the module id remains and will not change
+      // to the mapped name
+      define('LibMappedModules', ['MapToLibModule'], function(MapModule) {
+        expect(typeof MapModule).toBe('function');
+        var obj = new MapModule();
+        expect(obj.toString()).toBe('lib_mapped');
         done();
       });
     });

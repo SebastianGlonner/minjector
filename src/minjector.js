@@ -13,6 +13,30 @@
  * - missing some configuration values (as it is "allowed" ;) )
  * - no global require (as it is "allowed" ;) )
  *
+ * config: {
+ *   // All modules which DOES start with '.' or '/'
+ *   // will be searched relative to this base directory.
+ *   // This modules path will be normalized and therefore can be relative
+ *   // to this directory.
+ *   // Defaults to: './'
+ *   baseUrl: './some/dir'
+ *
+ *   // All modules which does NOT start with '.' or '/'
+ *   // will be included by appending there path to this path.
+ *   // This path does NOT get normalized.
+ *   // Defaults to: './'
+ *   libUrl: './some/other/dir'
+ *
+ *   // Mapp modules for modules to other modules.
+ *   // For more details:
+ *   // @link https://github.com/amdjs/amdjs-api/wiki/Common-Config#map-
+ *   map: {
+ *     'some/Module': {
+ *       'map/this/module': 'to/this/module'
+ *     }
+ *   }
+ * }
+ *
  * Global definitions:
  *   // Define function
  *   {function} define(id, dependencies, factory)
@@ -23,8 +47,6 @@
  * @author info@efesus.de (Sebastian Glonner)
  */
 
-
-'use strict';
 
 
 /* global Promise */
@@ -40,16 +62,11 @@
 /**
  * Constructor class.
  *
- * config: {
- *   // All modules will be searched relative to this base directory.
- *   baseUrl: './some/dir'
- * }
- *
- * @param {object} cfg A configuration.
+ * @param {object} cfg An optional configuration.
  * @constructor
  */
 var MinjectorClass = function(cfg) {
-  this.config(cfg);
+  'use strict';
 
   this.cache = {};
 
@@ -66,6 +83,15 @@ var MinjectorClass = function(cfg) {
 
   this.Bound = {};
   this.Bound.processDefineQueue = this.processDefineQueue.bind(this);
+
+  this.cfg = {
+    'baseUrl': './',
+    'libUrl' : './',
+    'map' : {}
+  };
+
+  if (cfg)
+    this.config(cfg);
 };
 
 
@@ -90,20 +116,14 @@ _proto.isNodeJs =
  * @this {Minjector}
  */
 _proto.config = function(cfg) {
-  this.cfg = {
-    'baseUrl': './',
-    'libUrl' : './'
-  };
+  if (cfg.baseUrl)
+    this.cfg.baseUrl = cfg.baseUrl;
 
-  if (typeof cfg !== 'object')
-    return;
+  if (cfg.libUrl)
+    this.cfg.libUrl = cfg.libUrl;
 
-  for (var i in cfg) {
-    if (!cfg.hasOwnProperty(i))
-      continue;
-
-    this.cfg[i] = cfg[i];
-  }
+  if (cfg.map)
+    this.cfg.map = cfg.map;
 };
 
 
@@ -140,6 +160,7 @@ _proto.define = function(id, dependencies, factory) {
 
   var module = {
     id: id,
+    path: false,
     dependencies: dependencies,
     factory: factory,
     ready: false,
@@ -415,9 +436,7 @@ if (_proto.isNodeJs) {
 
 
 /**
- * Create the path for an module by its id. Thereby reacting on the
- * id starting. Starting not with '/' or '.' requiring it from the lib
- * directory.
+ * Create the path for an module by its id.
  *
  * @param  {string} id Id of the dependency/module to require.
  * @param {object} parent The parent module of defined id.
@@ -425,68 +444,64 @@ if (_proto.isNodeJs) {
  * @this {Minjector}
  */
 _proto.createPath = function(id, parent) {
-  var fc = id.charAt(0);
-  if (fc === '.' || fc === '/') {
-    return this.normalizePath(
-        this.cfg.baseUrl,
-        id,
-        parent
-    );
+  // Check map config for module.
+  var fc, path, mapping = this.cfg.map[parent.id];
+  if (mapping && mapping[id])
+    id = mapping[id];
+
+  fc = id.charAt(0);
+  if (fc === '.') {
+    // We resolve parents only if we have relative module id
+    path = this.resolveParents(parent);
+    path += id;
+    fc = path.charAt(0);
+
   } else {
-    return this.cfg.libUrl + id;
+    path = id;
   }
+
+  // Is base or lib module
+  var base = fc === '.' || fc === '/' ?
+      this.cfg.baseUrl :
+      this.cfg.libUrl;
+
+  if (fc === '/')
+    path = path.substr(1);
+
+  return this.normalizePath(base, path);
 };
 
 
 /**
- * Normalize a module path. Add all parent modules
- * in relative cases (path starting with './' or '../').
- * @param  {string} base   The config.baseUrl.
- * @param  {string} path   The path/id of the current module.
+ * Resovle parent modules. Concatenate all ids of all parents
+ * until no more parent exist or the id is not relative.
  * @param  {object} parent The parent module of the current module.
  * @return {string}
  * @this {Minjector}
- *
- * @pure
  */
-_proto.normalizePath = function(base, path, parent) {
-  // Add the current module path to the parent stack for
-  // general path handling issues.
-  parent = {
-    id: path,
-    parent: parent
-  };
-
-  var parentResolution = '', first = true;
+_proto.resolveParents = function(parent) {
+  var joined = '', isRel;
   while (parent) {
     var parentId = parent.id;
     if (!parentId)
       break;
 
-    // Strip starting slahes.
-    if (parentId.charAt(0) === '/')
-      parentId = parentId.substr(1);
-
-    // Strip trailing slahes.
-    if (parentId.charAt(parentId.length - 1) === '/')
-      parentId = parentId.substr(0, parentId.length - 1);
-
-    // We don't want to cut of the module name of the current module!
-    if (first !== true) {
-
-      // Specification says:
-      // '/a/b/c' + './d/e' = '/a/b/d/e'
-      // '/a/b/c' + '../d/e' = '/a/d/e'
-      // Therefore in both cases we need to cut off the actual module name
-      // '/a/b/c' => '/a/b'
-      // '/e' => ''
-      parentId = parentId.substr(0, parentId.lastIndexOf('/') + 1);
+    // Used mapped id if exists.
+    if (parent.parent) {
+      var mapping = this.cfg.map[parent.parent.id];
+      if (mapping && mapping[parentId])
+        parentId = mapping[parentId];
     }
 
-    first = false;
+    isRel = parentId.charAt(0) === '.';
+    if (isRel)
+      parentId = '/' + parentId;
 
-    parentResolution = parentId + parentResolution;
-    if (parentId.charAt(0) !== '.') {
+    // Cut off the last part of the module id.
+    parentId = parentId.substr(0, parentId.lastIndexOf('/') + 1);
+
+    joined = parentId + joined;
+    if (!isRel) {
       // Not relative, therefore break the parent path resolution since
       // we start from baseUrl in this case and do not care for any more
       // parents.
@@ -497,14 +512,27 @@ _proto.normalizePath = function(base, path, parent) {
     parent = parent.parent;
   }
 
-  var pieces = base + parentResolution;
+  return joined.substr(0, joined.lastIndexOf('/') + 1);
+};
+
+
+/**
+ * Normalize path. Resolve all ".." and ".".
+ * @param  {string} base
+ * @param  {string} path
+ * @return {sting}
+ *
+ * @pure
+ */
+_proto.normalizePath = function(base, path) {
+  var pieces = base + path;
   var isStartingSlash = base.charAt(0) === '/';
   pieces = (isStartingSlash ? pieces.substr(1) : pieces).split('/');
 
   var res = [], piece, i, l, outside = 0;
   for (i = 0, l = pieces.length; i < l; i++) {
     piece = pieces[i];
-    if (piece === '.') {
+    if (piece === '.' || piece === '') {
 
     } else if (piece === '..') {
       if (res.length > outside)
@@ -517,6 +545,7 @@ _proto.normalizePath = function(base, path, parent) {
     } else
       res.push(piece);
   }
+
   return (isStartingSlash ? '/' : '') + res.join('/');
 };
 

@@ -37,6 +37,12 @@ where you want to put modules/libraries like e. g. jQuery.
 All modules which start with '/' or '.' will be required relative to this
 directory!
 
+> map
+
+Mapp modules for modules to other modules.
+For more details:
+[AMD Specification](https://github.com/amdjs/amdjs-api/wiki/Common-Config#map-)
+
 # Dont's you want to know
 * Do NOT require a module which has no module defined
 * Do NOT require a module where you set explicity another id for the module
@@ -156,6 +162,11 @@ Simplicity, this implementation serves to load JavaScript AMD like modules only.
 Tests implemented with jasmine 2.0. Running in Node.js and Browsers
 
 # Roadmap
+
+* Throw meaningful error in case of Factory function does not return
+
+* Add "map" config
+
 * Optimizer script, basically concatening modules,
   but supporting some kind of "top level entry points".
   Means that if I have a single page application and have multiple

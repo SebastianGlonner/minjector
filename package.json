@@ -1,0 +1,37 @@
+{
+  "name": "minjector",
+  "version": "0.0.1",
+  "description": "JavaScript Node / Browser AMD loader.",
+
+  "devDependencies": {
+    "grunt-cli": "latest",
+    "grunt-contrib-watch": "latest",
+    "grunt-contrib-uglify": "latest",
+    "grunt-exec": "latest"
+  },
+  "main": "bin/minjector.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "jasmine"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SebastianGlonner/minjector.git"
+  },
+  "keywords": [
+    "JavaScript",
+    "js",
+    "loader",
+    "amd",
+    "browser",
+    "node"
+  ],
+  "author": "Sebastian Glonner <info@efesus.de>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/SebastianGlonner/minjector/issues"
+  },
+  "homepage": "https://github.com/SebastianGlonner/minjector"
+}
