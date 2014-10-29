@@ -29,7 +29,7 @@
  *
  *   // Mapp modules for modules to other modules.
  *   // For more details:
- *   // @link https://github.com/amdjs/amdjs-api/wiki/Common-Config#map-
+ *   // {@link https://github.com/amdjs/amdjs-api/wiki/Common-Config#map-}
  *   map: {
  *     'some/Module': {
  *       'map/this/module': 'to/this/module'
@@ -158,16 +158,7 @@ _proto.define = function(id, dependencies, factory) {
     throw new Error('Found ambiguous module: ' + id);
   }
 
-  var module = {
-    id: id,
-    path: false,
-    dependencies: dependencies,
-    factory: factory,
-    ready: false,
-    instance: null,
-    listen: [],
-    parent: null
-  };
+  var module = this.initModule(id, dependencies, factory);
 
   if (id)
     this.cache[id] = module;
@@ -183,6 +174,26 @@ _proto.define = function(id, dependencies, factory) {
 
   this.procWaiting = true;
   this.onNextTick(this.Bound.processDefineQueue);
+};
+
+
+/**
+ * Initialize module object. Params @see this.define()
+ * @param  {string}   id
+ * @param  {array}    dependencies
+ * @param  {function} factory
+ * @return {object}
+ */
+_proto.initModule = function(id, dependencies, factory) {
+  return {
+    id: id,
+    dependencies: dependencies,
+    factory: factory,
+    ready: false,
+    instance: null,
+    listen: [],
+    parent: null
+  };
 };
 
 
@@ -278,7 +289,8 @@ _proto.createModule = function(module) {
 
   // Add this module to the cache now! So that other modules know that this
   // dependency is in progress of loading / creating.
-  this.cache[module.id] = module;
+  if (module.id)
+    this.cache[module.id] = module;
 
   if (!hasPromise) {
     // This should be a performance win since we do not create an extra
@@ -571,16 +583,21 @@ if (_proto.isNodeJs) {
 
 /**
  * Local require implementation.
- * @param  {mixed}    id
+ * {@link https://github.com/amdjs/amdjs-api/wiki/require}
+ * @param  {mixed}    mixed Id or array of dependencies.
  * @param  {function} callback
  * @return {mixed} The required module on synchronous call.
  * @this {Minjector}
  */
-_proto.require = function(id, callback) {
-  if (typeof id === 'string') {
-    return this.cache[id].instance;
+_proto.require = function(mixed, callback) {
+  if (typeof mixed === 'string' && arguments.length === 1) {
+    return this.cache[mixed].instance;
+
+  } else if (Array.isArray(mixed)) {
+    this.createModule.call(this, this.initModule(null, mixed, callback));
+
   } else {
-    this.define.call(this, id, callback);
+    throw new Error('Invalid arguments signature for require()');
   }
 };
 

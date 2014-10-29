@@ -308,13 +308,16 @@ describe('minjector', function() {
       });
     });
 
-    it('and handle multiple anonym modules in single file', function(done) {
-      define(['/OverwriteModule'], function(OverwriteModule) {
-        expect(typeof OverwriteModule).toBe('object');
-        expect(OverwriteModule.anonym2).toBe(2);
-        done();
-      });
-    });
+    it('and handle multiple anonym modules in single file' +
+       'overide each other',
+        function(done) {
+          define(['/OverwriteModule'], function(OverwriteModule) {
+            expect(typeof OverwriteModule).toBe('object');
+            expect(OverwriteModule.anonym2).toBe(2);
+            done();
+          });
+        }
+    );
 
   });
 
@@ -460,6 +463,27 @@ describe('minjector', function() {
         });
       });
     });
+
+    it('and multiple require() call dont overide anonym defined()' +
+        ' modules',
+        function(done) {
+          define(['/req/Uniqueness', 'require'], function(Uniqueness, require) {
+            expect(typeof Uniqueness).toBe('function');
+
+            var u = new Uniqueness();
+            expect(u.uniquee()).toBe('uniquee');
+
+            var callback = function() {
+              var uni = require('/req/Uniqueness');
+              var un = new uni();
+              expect(un.uniquee()).toBe('uniquee');
+              done();
+            };
+
+            expect(u.doRequireModule(callback)).toBe('didSomeRequire');
+          });
+        }
+    );
 
     // This is actually nonesense in browsers / asynchronous dependencies
     // resolution, to realize this we would have to wait for the first
