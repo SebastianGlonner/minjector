@@ -59,6 +59,6 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-exec');
 
   grunt.registerTask('default', ['watch']);
-  grunt.registerTask('compile', ['uglify', 'exec']);
+  grunt.registerTask('build', ['uglify', 'exec']);
 
 };
