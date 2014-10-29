@@ -161,7 +161,7 @@ Simplicity, this implementation serves to load JavaScript AMD like modules only.
 
 Tests implemented with jasmine 2.0. Running in Node.js and Browsers
 
-# Roadmap
+# Roadmap / Issues
 
 * Throw meaningful error in case of Factory function does not return
 
@@ -184,6 +184,11 @@ Tests implemented with jasmine 2.0. Running in Node.js and Browsers
   drawback since we planing to add an optimized version.
 
 * Support for loader plugins
+
+* local require() calls does not consider config.map at the moment
+
+* jasmine-node badly failes for some sort of global exceptions?!
+  Require investigation and I consider changing the test framework.
 
 # Feedback / Review / Criticism
 I appreciate any kind of feedback!
