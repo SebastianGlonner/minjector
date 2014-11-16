@@ -36,8 +36,6 @@ define(['require'], function(require) {
         doCallCallback();
       });
     });
-
-    return 'didSomeRequire';
   };
 
   return M;

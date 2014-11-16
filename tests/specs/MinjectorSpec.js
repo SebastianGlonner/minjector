@@ -464,6 +464,15 @@ describe('minjector', function() {
       });
     });
 
+    it('and require relative paths correctly', function(done) {
+      define(['/require/RequireAbsolute'], function(RequireAbsolute) {
+        RequireAbsolute.doRelRequire(function(value) {
+          expect(value).toBe('12489357hm');
+          done();
+        });
+      });
+    });
+
     it('and multiple require() call dont overide anonym defined()' +
         ' modules',
         function(done) {
@@ -480,7 +489,7 @@ describe('minjector', function() {
               done();
             };
 
-            expect(u.doRequireModule(callback)).toBe('didSomeRequire');
+            u.doRequireModule(callback);
           });
         }
     );

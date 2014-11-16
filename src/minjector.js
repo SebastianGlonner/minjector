@@ -70,9 +70,6 @@ var MinjectorClass = function(cfg) {
 
   this.cache = {};
 
-  // Add local require
-  this.mockModule('require', this.require.bind(this));
-
   // This separated caching object is required for situations where
   // 2 modules in the same file (therefore running synchronous) require the
   // same module. With this object we save all required but not yet created
@@ -238,10 +235,11 @@ _proto.processDefineQueue = function(id, parent) {
  * the factory function.
  *
  * @param  {object} module The object representing the module.
+ * @param  {boolean} isRequire Was called from require([...], ...).
  * @return {object} The object representing the module.
  * @this {Minjector}
  */
-_proto.createModule = function(module) {
+_proto.createModule = function(module, isRequire) {
   var dependencies = module.dependencies;
 
   var resolvedDependencies = [];
@@ -251,8 +249,18 @@ _proto.createModule = function(module) {
     for (i = 0, l = dependencies.length; i < l; i++) {
       dependencyId = dependencies[i];
 
-      // The dependency might be already defined ...
-      dependency = this.cache[dependencyId];
+      if (dependencyId === 'require') {
+        dependency = {
+          ready: true,
+          instance: function(mixed, callback) {
+            return this.require(mixed, callback, module);
+          }.bind(this)
+        };
+      } else {
+        // The dependency might be already defined ...
+        dependency = this.cache[dependencyId];
+      }
+
       if (!dependency) {
         hasPromise = true;
         // ... or is already required and in loading state.
@@ -289,7 +297,7 @@ _proto.createModule = function(module) {
 
   // Add this module to the cache now! So that other modules know that this
   // dependency is in progress of loading / creating.
-  if (module.id)
+  if (module.id && !isRequire)
     this.cache[module.id] = module;
 
   if (!hasPromise) {
@@ -586,15 +594,20 @@ if (_proto.isNodeJs) {
  * {@link https://github.com/amdjs/amdjs-api/wiki/require}
  * @param  {mixed}    mixed Id or array of dependencies.
  * @param  {function} callback
+ * @param {object} parentModule The module in which this require gets called.
  * @return {mixed} The required module on synchronous call.
  * @this {Minjector}
  */
-_proto.require = function(mixed, callback) {
-  if (typeof mixed === 'string' && arguments.length === 1) {
+_proto.require = function(mixed, callback, parentModule) {
+  if (typeof mixed === 'string') {
     return this.cache[mixed].instance;
 
   } else if (Array.isArray(mixed)) {
-    this.createModule.call(this, this.initModule(null, mixed, callback));
+    this.createModule.call(
+        this,
+        this.initModule(parentModule.id, mixed, callback),
+        true
+    );
 
   } else {
     throw new Error('Invalid arguments signature for require()');
