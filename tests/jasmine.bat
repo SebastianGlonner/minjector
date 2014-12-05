@@ -1,1 +1,1 @@
-jasmine-node --verbose --captureExceptions specs/
+jasmine-node --verbose --captureExceptions specs/IntegrationSpec.js

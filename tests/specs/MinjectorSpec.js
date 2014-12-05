@@ -8,34 +8,38 @@ describe('minjector', function() {
       typeof exports !== 'undefined' && this.exports !== exports;
 
   if (isNodeJs) {
-    var config = require(process.cwd() + '/bootstrap.node.js');
-    require(config.DIR.BIN + 'minjector');
+    var common = require('../../common.js');
+    // require(config.DIR.BIN + 'minjector.min.js');
+    require(common.INCLUDE + 'minjector.js');
   }
 
   beforeEach(function() {
     if (isNodeJs) {
       Minjector.config({
-        baseUrl: config.DIR.TESTS_DATA,
-        libUrl: config.DIR.TESTS_DATA + 'lib/'
+        baseUrl: common.DIR.TESTS_DATA,
+        libUrl: common.DIR.TESTS_DATA + 'lib/'
       });
     } else {
       // The minjector library will be loaded in the HTML spec file.
       Minjector.config({
         baseUrl: './data/',
-        libUrl: './data/lib/',
-        map: {
-          'WantMappedModules': {
-            '/MapModule': '/mapped/mapit'
-          },
-          '/MapModule': {
-            'getMapped2': '/mapped/recmap'
-          },
-          'LibMappedModules': {
-            'MapToLibModule': 'MappedInLib'
-          }
-        }
+        libUrl: './data/lib/'
       });
     }
+
+    Minjector.config({
+      map: {
+        'WantMappedModules': {
+          '/MapModule': '/mapped/mapit'
+        },
+        '/MapModule': {
+          'getMapped2': '/mapped/recmap'
+        },
+        'LibMappedModules': {
+          'MapToLibModule': 'MappedInLib'
+        }
+      }
+    });
   });
 
   describe('can handle AMD define', function() {
@@ -467,11 +471,17 @@ describe('minjector', function() {
     it('and require relative paths correctly', function(done) {
       define(['/require/RequireAbsolute'], function(RequireAbsolute) {
         RequireAbsolute.doRelRequire(function(value) {
-          expect(value).toBe('12489357hm');
+          expect(value).toBe('12489357hmcranky');
           done();
         });
       });
     });
+
+    xit('inline define()\' resolution is not supported since inline defines ' +
+        'should not exist!',
+        function() {
+        }
+    );
 
     it('and multiple require() call dont overide anonym defined()' +
         ' modules',
@@ -528,20 +538,9 @@ describe('minjector', function() {
     });
   });
 
-  describe('can handle usability errors', function() {
-    it('and usefully handles errors inside a factory function', function(done) {
-      spyOn(console, 'error').and.callFake(function() {
-        done();
-      }); //.and.callThrough();
-      define(['/errors/ErrorModule'], function() {
-        // ...
-      });
-    });
-  });
-
   describe('can handle a "libUrl" config param', function() {
     it('and correctly includes modules from lib', function(done) {
-      define(['LibModule'], function(LibModule) {
+      define(['/lib/LibModule'], function(LibModule) {
         expect(typeof LibModule).toBe('object');
         expect(LibModule.libMethod()).toBe('yei');
         done();
@@ -569,6 +568,19 @@ describe('minjector', function() {
         var obj = new MapModule();
         expect(obj.toString()).toBe('lib_mapped');
         done();
+      });
+    });
+  });
+
+  // NOTE: Should always be last test since this produces javascript reference
+  // error and further executing can not be guaranteed.
+  describe('can handle usability errors', function() {
+    it('and usefully handles errors inside a factory function', function(done) {
+      spyOn(console, 'error').and.callFake(function() {
+        done();
+      }); //.and.callThrough();
+      define(['/errors/ErrorModule'], function() {
+        // ...
       });
     });
   });

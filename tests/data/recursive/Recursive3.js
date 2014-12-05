@@ -1,5 +1,5 @@
 define(
-    function(RecursiveModule) {
+    function() {
       var module = function() {
       };
       module.prototype.getRecursive = function() {

@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "description": "JavaScript Node / Browser AMD loader.",
 
+  "dependencies": {
+    "uglify-js": "latest"
+  },
+
   "devDependencies": {
     "grunt-cli": "latest",
     "grunt-contrib-watch": "latest",
