@@ -5,7 +5,7 @@ minjector
 Truly Node.js does not require an AMD loader. Despite of this it is supported
 to allow writing modules which are required in browsers and Nodes.js. The
 performance drawback for Node.js is not to much since all modules still get
-included synchronously. You just get littel overhead through .onNextTicke()
+included synchronously. You just get little overhead through .onNextTick()
 which you might want to consider if you require to save every single
 millisecond.
 
@@ -13,10 +13,10 @@ You dont know what an AMD loader is:
 [AMD Specification](https://github.com/amdjs/amdjs-api/blob/master/AMD.md)
 
 You dont know why you should use an AMD loader:
-Checkout excellent page:
+Checkout this excellent page:
 [requirejs](http://requirejs.org/docs/whyamd.html)
 
-# Why reimplementing this despite of their exists requirejs and co.?
+# Why reimplementing this despite of there exists requirejs and co.?
 > Mobile first
 
 * Simplicity! (no support for full AMD spec)
