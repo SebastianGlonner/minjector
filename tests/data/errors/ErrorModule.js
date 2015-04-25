@@ -1,4 +1,5 @@
 define(['/errors/ErrorModule2'], function() {
+  var badref = {};
   // throw error
-  var want = aaaaaa.undef.property;
+  var want = badref.undef.property;
 });

@@ -579,6 +579,7 @@ describe('minjector', function() {
       spyOn(console, 'error').and.callFake(function() {
         done();
       }); //.and.callThrough();
+
       define(['/errors/ErrorModule'], function() {
         // ...
       });

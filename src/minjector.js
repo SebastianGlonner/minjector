@@ -60,19 +60,21 @@
 
 
 
-  /* global Promise */
-  /* global window */
-  /* global document */
-  /* global GLOBAL */
-  /* global require */
-  /* global exports */
-  /* global console */
+/* global Promise */
+/* global window */
+/* global document */
+/* global GLOBAL */
+/* global require */
+/* global exports */
+/* global console */
 
 
 
 (function(isNodeJs) {
   'use strict';
 
+  if (typeof console.error === 'undefined')
+    console.error = console.log.bind(console);
 
   /**
    * Constructor class.
@@ -320,15 +322,11 @@
       // Create Promise resolving if all dependencies are resolved.
       module.instance = Promise.all(resolvedDependencies)
         .then(function(resolvedDependencies) {
-            var _module = module;
             return this.callFactoryCallback(
-                _module,
+                module,
                 resolvedDependencies
             );
-          }.bind(this))
-        .catch (function(e) {
-            console.error(e.stack);
-          });
+          }.bind(this));
     }
 
     return module;
@@ -344,7 +342,12 @@
    * @this {Minjector}
    */
   _proto.callFactoryCallback = function(module, resolvedDependencies) {
-    module.instance = module.factory.apply(null, resolvedDependencies);
+    try {
+      module.instance = module.factory.apply(null, resolvedDependencies);
+    } catch (e) {
+      console.error(e);
+    }
+
     module.ready = true;
     delete this.isRequired[module.id];
 
