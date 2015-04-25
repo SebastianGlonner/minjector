@@ -15,19 +15,19 @@ describe('minjector', function() {
 
   beforeEach(function() {
     if (isNodeJs) {
-      Minjector.config({
+      define.config({
         baseUrl: common.DIR.TESTS_DATA,
         libUrl: common.DIR.TESTS_DATA + 'lib/'
       });
     } else {
       // The minjector library will be loaded in the HTML spec file.
-      Minjector.config({
+      define.config({
         baseUrl: './data/',
         libUrl: './data/lib/'
       });
     }
 
-    Minjector.config({
+    define.config({
       map: {
         'WantMappedModules': {
           '/MapModule': '/mapped/mapit'
@@ -302,7 +302,7 @@ describe('minjector', function() {
         return 'faking behaviour';
       };
 
-      Minjector.mockModule('/MyMockedModule', MMM);
+      define.minjector.mockModule('/MyMockedModule', MMM);
 
       define(['/MyMockedModule'], function(MyMockedModule) {
         expect(typeof MyMockedModule).toBe('function');
@@ -327,45 +327,45 @@ describe('minjector', function() {
 
   describe('can handle path normalization', function() {
     it('and normalize "./" correctly', function() {
-      Minjector.config({'baseUrl': '/a/b/'});
-      expect(Minjector.createPath(
+      define.minjector.config({'baseUrl': '/a/b/'});
+      expect(define.minjector.createPath(
           './d',
           {'id': './c', 'parent': null}
           )).toBe('/a/b/d');
 
-      expect(Minjector.createPath(
+      expect(define.minjector.createPath(
           './f/g',
           {'id': './c/d/e', 'parent': null}
           )).toBe('/a/b/c/d/f/g');
     });
 
     it('and normalize "../" correctly', function() {
-      Minjector.config({'baseUrl': '/a/b/'});
-      expect(Minjector.createPath(
+      define.minjector.config({'baseUrl': '/a/b/'});
+      expect(define.minjector.createPath(
           '../d',
           {'id': './c', 'parent': null}
           )).toBe('/a/d');
 
-      expect(Minjector.createPath(
+      expect(define.minjector.createPath(
           '../f/g',
           {'id': './c/d/e', 'parent': null}
           )).toBe('/a/b/c/f/g');
 
-      expect(Minjector.createPath(
+      expect(define.minjector.createPath(
           '../../f/g',
           {'id': './c/d/e', 'parent': null}
           )).toBe('/a/b/f/g');
 
-      Minjector.config({'baseUrl': '/a/b/c/d/'});
-      expect(Minjector.createPath(
+      define.minjector.config({'baseUrl': '/a/b/c/d/'});
+      expect(define.minjector.createPath(
           '../../f',
           {'id': 'e', 'parent': null}
           )).toBe('/a/b/f');
     });
 
     it('and handle starting "/" in path', function() {
-      Minjector.config({'baseUrl': '/a/b/'});
-      expect(Minjector.createPath(
+      define.minjector.config({'baseUrl': '/a/b/'});
+      expect(define.minjector.createPath(
           '/f/g',
           {'id': 'c/d/e', 'parent': null}
           )).toBe('/a/b/f/g');
@@ -379,8 +379,8 @@ describe('minjector', function() {
       parent3.parent = parent2;
       parent2.parent = parent1;
 
-      Minjector.config({'baseUrl': '/a/b/'});
-      expect(Minjector.createPath(
+      define.minjector.config({'baseUrl': '/a/b/'});
+      expect(define.minjector.createPath(
           './k',
           {'id': './i/j', 'parent': parent3}
           )).toBe('/a/b/c/e/f/i/k');
@@ -394,8 +394,8 @@ describe('minjector', function() {
       parent3.parent = parent2;
       parent2.parent = parent1;
 
-      Minjector.config({'baseUrl': '/a/b/'});
-      expect(Minjector.createPath(
+      define.minjector.config({'baseUrl': '/a/b/'});
+      expect(define.minjector.createPath(
           './k',
           {'id': './i/j', 'parent': parent3}
           )).toBe('/a/b/i/k');
@@ -404,25 +404,25 @@ describe('minjector', function() {
     it('do not cut /../ into nothing, allowing to use pahts above the' +
         'absolute root e.g. "./my/../../path" => "../path"',
         function() {
-          expect(Minjector.normalizePath(
+          expect(define.minjector.normalizePath(
               'a/b/',
               '../../../d',
               null
               )).toBe('../d');
 
-          expect(Minjector.normalizePath(
+          expect(define.minjector.normalizePath(
               '/a/b/',
               '../../../d',
               null
               )).toBe('/../d');
 
-          expect(Minjector.normalizePath(
+          expect(define.minjector.normalizePath(
               '/a/b/',
               '../../../c/d/../..',
               null
               )).toBe('/..');
 
-          expect(Minjector.normalizePath(
+          expect(define.minjector.normalizePath(
               '/a/b/',
               '../../../c/d/../../..',
               null
