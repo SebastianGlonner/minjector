@@ -454,8 +454,15 @@
         process.nextTick(function() {
           require(path);
           _this.processDefineQueue(id, parentModule);
-
-          resolve(module.resolveToInstance());
+          if (module.predefined === true) {
+            // If the required dependency is still set to predefined then there
+            // was no define(...) (not anonym nor explicit) which defines the
+            // requested dependency, therefore resolve to undefined, so that
+            // the factory function gets called
+            module.predefined = false;
+            resolve(undefined)
+          } else
+            resolve(module.resolveToInstance());
         });
       });
     } :
@@ -470,7 +477,16 @@
 
         scriptTag.addEventListener('load', function() {
           _this.processDefineQueue(id, parentModule);
-          resolve(module.resolveToInstance());
+          if (module.predefined === true) {
+            // If the required dependency is still set to predefined then there
+            // was no define(...) (not anonym nor explicit) which defines the
+            // requested dependency, therefore resolve to undefined, so that
+            // the factory function gets called
+            module.predefined = false;
+            resolve(undefined)
+          } else
+            resolve(module.resolveToInstance());
+
         }, false);
 
         _this.domDocumentHead.appendChild(scriptTag);

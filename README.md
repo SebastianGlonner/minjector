@@ -44,7 +44,6 @@ For more details:
 [AMD Specification](https://github.com/amdjs/amdjs-api/wiki/Common-Config#map-)
 
 # Dont's you want to know
-* Do NOT require a module which has no module defined
 * Do NOT require a module where you set explicity another id for the module
 than the required path
 ```
@@ -114,24 +113,7 @@ the function.toString() and searching for
 performance overkill for convenience, i like the approach of just proper
 code formatting.
 
-__No support for "empty modules"__
-
-There is no support for something like
-```
-define(['SomeFile'], function() {
-
-})
-```
-where SomeFile.js contains something like:
-```
-var POLLUTING_GLOBAL_NAMESPACE = 'is no good coding style';
-/* and no more code */
-```
-Since we are encouraged and want to use the "Module Pattern" we do not
-introduce possibilities to workaround this by extra code. If you load a
-module you have to define() a module or you will receive an ugly error.
-
-__No / less error handling due to wrong usage of this framework__
+__No / less error handling due to wrong usage of this implementation__
 
 Since the API is rather simple i did not introduce extra bytes for
 error handling of wrong usage misstakes.

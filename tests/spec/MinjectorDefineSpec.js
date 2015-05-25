@@ -56,6 +56,19 @@ describe('minjector define', function() {
       });
     });
 
+    it('and can handle empty modules', function(done) {
+      // loading specific module id resulting in an file which does not
+      // contain anonym modules nor a module with the requested id explicitly
+      // set
+      define(['/emptyModule', 'require'], function(emptyModule, require) {
+        expect(emptyModule).toBe(undefined);
+        require(['/emptyModule2'], function(emptyModule2) {
+          expect(emptyModule2).toBe(undefined);
+          done();
+        });
+      });
+    });
+
     it('and modules in single file require same dependency', function(done) {
       define(['/single/WeRequire'], function(WeRequire) {
         expect(typeof WeRequire).toBe('function');
