@@ -1,4 +1,6 @@
-
+// Tricky part here is that this first defined anonym module has
+// a dependency for the module defined in this file but after this one.
+//
 define(['/NextInThisFile'], function(NextInThisFile) {
   var module = function() {
   };

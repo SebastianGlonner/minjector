@@ -8,6 +8,8 @@
  * and run in "any" environment (browser, nodejs) (any does not fit
  * correctly since i do not support any browser ;) ).
  *
+ * No use of "eval".
+ *
  * Known missing specifications implementations:
  * - loader plugins
  * - missing some configuration values (as it is "allowed" ;) )
@@ -52,9 +54,6 @@
  *   // Define function
  *   {function} define(id, dependencies, factory)
  *
- *   // Default instantiation of this implemenation.
- *   {object} Minjector
- *
  * @author info@efesus.de (Sebastian Glonner)
  */
 
@@ -73,8 +72,68 @@
 (function(isNodeJs) {
   'use strict';
 
-  if (typeof console.error === 'undefined')
+
+  if (typeof console.error !== 'function')
     console.error = console.log.bind(console);
+
+
+  /**
+   * A module.
+   *
+   * @param {string} id
+   * @param {array} dependencies
+   * @param {function} factory
+   */
+  var Module = function(id, dependencies, factory) {
+    this.id = id;
+    this.path = undefined;
+    this.dependencies = dependencies;
+    this.resolvedDependencies = undefined;
+    this.factory = factory;
+    this.instance = undefined;
+    this.parent = undefined;
+    this.listen = [];
+    this.loading = undefined;
+    this.predefined = false;
+  };
+
+  /**
+   * Returning the instance or an promise which will resolve to the instance
+   * of this module.
+   *
+   * @return {mixed}
+   */
+  Module.prototype.resolveToInstance = function() {
+    if (this.instance !== undefined)
+      return this.instance;
+
+    if (this.loading)
+      return this.loading;
+
+    return this.listenOnCreation();
+  };
+
+  /**
+   * Add listener for the module instance creation event.
+   */
+  Module.prototype.listenOnCreation = function() {
+    return new Promise(function(resolve, reject) {
+      this.listen.push(function(moduleInstance) {
+        resolve(moduleInstance);
+      });
+    }.bind(this));
+  };
+
+  /**
+   * Fire instance creation event for this module.
+   */
+  Module.prototype.fireOnCreation = function() {
+    var listen = this.listen, instance = this.instance;
+    for (var i = 0, l = listen.length; i < l; i++) {
+      listen[i](instance);
+    }
+  };
+
 
   /**
    * Constructor class.
@@ -83,19 +142,10 @@
    * @constructor
    */
   var MinjectorClass = function(cfg) {
-
     this.cache = {};
-
-    // This separated caching object is required for situations where
-    // 2 modules in the same file (therefore running synchronous) require the
-    // same module. With this object we save all required but not yet created
-    // modules.
-    this.isRequired = {};
     this.defineQueue = [];
-    this.procWaiting = false;
 
-    this.Bound = {};
-    this.Bound.processDefineQueue = this.processDefineQueue.bind(this);
+    this.boundProcessDefineQueue = this.processDefineQueue.bind(this);
 
     this.cfg = {
       'baseUrl': './',
@@ -109,7 +159,6 @@
 
 
   /**
-   * Performance / Convenience.
    * @type {object}
    */
   var _proto = MinjectorClass.prototype;
@@ -162,79 +211,60 @@
     if (typeof factory !== 'function')
       throw new Error('Require module factory function: ' + id);
 
-    if (id && this.cache[id]) {
-      throw new Error('Found ambiguous module: ' + id);
-    }
+    this.defineQueue.push([id, dependencies, factory]);
 
-    var module = this.initModule(id, dependencies, factory);
-
-    if (id)
-      this.cache[id] = module;
-
-    this.defineQueue.push(module);
-
-    // This is necessary for the "entry point"! Somewhere you have to start
+    // This is necessary for the "entry point". Somewhere you have to start
     // using define() and this very first call would just not process.
-    // However all included dependencies will call .processDefineQueue on their
+    // However all required dependencies will call .processDefineQueue on their
     // own after including the appropriate file.
-    if (this.procWaiting)
-      return;
-
-    this.procWaiting = true;
-    this.onNextTick(this.Bound.processDefineQueue);
+    this.onNextTick(this.boundProcessDefineQueue);
   };
 
 
   /**
-   * Initialize module object. Params @see this.define()
-   * @param  {string}   id
-   * @param  {array}    dependencies
-   * @param  {function} factory
-   * @return {object}
-   */
-  _proto.initModule = function(id, dependencies, factory) {
-    return {
-      id: id,
-      dependencies: dependencies,
-      factory: factory,
-      ready: false,
-      instance: null,
-      listen: [],
-      parent: null
-    };
-  };
-
-
-  /**
-   * Process all calls to define(...). This is necessary to support multiple
-   * modules in a single file.
+   * Process all calls to define(...). Means after this call all the modules
+   * are defined and in the cache but not neccesarily loaded/instantiated.
    *
-   * @param {string} id
-   * @param {object} parent The parent module of defined id.
+   * @param {string} dependencyId
+   * @param {Module} parent The parent module of the currentyl queued define's.
    * @this {Minjector}
    */
-  _proto.processDefineQueue = function(id, parent) {
-    this.procWaiting = false;
+  _proto.processDefineQueue = function(dependencyId, parent) {
     var queue = this.defineQueue;
     if (queue.length === 0)
       return;
 
-    // On purpose: Process all define() calls...
-    var module, creatingQueue = [];
+    // On purpose: Process all define() calls ...
+    var args, id, creatingQueue = [], anonym = 0, ambiguous;
     while (queue.length) {
-      module = queue.pop();
+      args = queue.pop();
+      id = args[0];
 
-      module.parent = parent;
+      // If we included a anonym module, now is the time to set
+      // the id of this module, which is then its path / "include id".
+      if (!id) {
+        id = dependencyId;
+        anonym++;
+      } else {
+        ambiguous = this.cache[this.createPath(id, parent)];
+        if (ambiguous && ambiguous.predefined !== true) {
+          console.error('Found ambiguous module: ' + id);
+          continue;
+        }
+      }
 
-      if (!module.id)
-        module.id = id;
-
-      creatingQueue.push(module);
+      creatingQueue.push(this.defineModule(id, args[1], args[2], parent));
     }
 
-    // and then start creating the modules which has been defined.
+    if (anonym > 1) {
+      console.error('InvalidSyntaxException: Found multiple anonym ' +
+          'modules in: ' + id);
+    }
+
+    // ... and then start creating the modules which has been defined.
     // Because we need to know which modules are in the
-    // current file before starting creating them.
+    // current file before starting creating them (supporting independent
+    // module order in one file)
     while (creatingQueue.length) {
       this.createModule(creatingQueue.pop());
     }
@@ -242,233 +272,226 @@
 
 
   /**
-   * Create the module by resolving all dependencies and executing
-   * the factory function.
+   * Define a module. Means adding it to the cache and or setting various
+   * properties.
    *
-   * @param  {object} module The object representing the module.
-   * @param  {boolean} isRequire Was called from require([...], ...).
-   * @return {object} The object representing the module.
+   * @param  {string} id
+   * @param  {array} dependencies
+   * @param  {function} factory
+   * @param  {Module} parent The parent module of this one.
+   * @return {Module}
+   *
    * @this {Minjector}
    */
-  _proto.createModule = function(module, isRequire) {
+  _proto.defineModule = function(id, dependencies, factory, parent) {
+    var path, module, cached, fromCache = false;
+    // Just writing "define(function() {});" is valid. However if this anonym
+    // module wont get included as dependency (and therefore receiving an id)
+    // the factory function should be executed without saving it to the cache.
+    // This might be the case for the very first entry point which can be this
+    // or an "require()" call.
+    if (id) {
+      path = this.createPath(id, parent);
+      module = this.cache[path];
+    }
+
+    if (!module)
+      module = new Module(id, dependencies, factory);
+    else {
+      // If the module is already defined during dependency resolution then
+      // we do not have any other information than the dependenyId.
+      // Therefore set this value now.
+      module.dependencies = dependencies;
+      module.factory = factory;
+      module.predefined = false;
+      fromCache = true;
+    }
+
+    if (path) {
+      if ( fromCache !== true ) {
+        // Prevent object lookup if module is already in the cache.
+        this.cache[path] = module;
+      }
+
+      module.path = path;
+    }
+
+    module.parent = parent;
+    return module;
+  };
+
+
+  /**
+   * Create the module by resolving all dependencies and executing
+   * the factory function then.
+   *
+   * @param  {string} id
+   * @param  {array} dependencies
+   * @param  {function} factory
+   * @param  {object} parent The object representing parent module of this one.
+   *
+   * @this {Minjector}
+   */
+  _proto.createModule = function(module) {
+    var loading = module.dependencies ?
+      this.createDependencies(module) :
+      Promise.resolve();
+
+    module.loading = loading.then(function(resolvedDependencies) {
+      module.resolvedDependencies = resolvedDependencies;
+      return this.callFactory(module);
+    }.bind(this));
+  };
+
+
+  /**
+   * Resolve all of this modules dependencies. Returning Promise resolving to
+   * these instantiated dependencies.
+   *
+   * @param  {Module} module
+   * @return {Promise}
+   */
+  _proto.createDependencies = function(module) {
     var dependencies = module.dependencies;
 
-    var resolvedDependencies = [];
-    var hasPromise = false;
+    var resolvedDependencies = [],
+      i, l, dependency, dependencyId, dependencyPath, dependencyModule;
     if (dependencies !== undefined) {
-      var i, l, dependency, dependencyId;
       for (i = 0, l = dependencies.length; i < l; i++) {
         dependencyId = dependencies[i];
 
+        // Special treatment for the inline "require" AMD specification.
         if (dependencyId === 'require') {
-          dependency = {
-            ready: true,
-            instance: function(mixed, callback) {
-              return this.require(mixed, callback, module);
-            }.bind(this)
-          };
-        } else {
-          // The dependency might be already defined ...
-          dependency = this.cache[dependencyId];
+          resolvedDependencies.push(function(mixed, callback) {
+            // Need to create this function here cause we need the parent
+            // module as closure.
+            return this.require(mixed, callback, module);
+          }.bind(this));
+
+          continue;
         }
 
+        // The dependency might be already defined ...
+        dependencyPath = this.createPath(dependencyId, module);
+        dependency = this.cache[dependencyPath];
+
         if (!dependency) {
-          hasPromise = true;
-          // ... or is already required and in loading state.
-          dependency = this.isRequired[dependencyId];
+          // Save the dependency to the cache as predefined so that all
+          // comming modules know this dependency is known and in process of
+          // resolving.
+          dependencyModule = new Module(dependencyId);
+          dependencyModule.predefined = true;
+          this.cache[dependencyPath] = dependencyModule;
 
-          if (!dependency) {
-            dependency = this.requireDependency(dependencyId, module);
+          dependency = this.requireDependency(
+              dependencyPath,
+              dependencyModule,
+              dependencyId,
+              module
+          );
 
-            if (dependency instanceof Promise) {
-              // We need to save the Promise which will create this module some
-              // how. Cause there might come more modules which depends on this
-              // one but have to wait before it is loaded as well. In this case
-              // we dont want to include it again or create a second Promise, but
-              // reuse the existing one.
-              this.isRequired[dependencyId] = dependency;
-            } else {
-              // Since Node.js might be cabable of requiring synchronous
-              // without the need of a Promise.
-              hasPromise = false;
-            }
-
-          }
-
-        } else if (!dependency.ready) {
-          hasPromise = true;
-          dependency = this.listenOnCreation(dependency);
         } else {
-          dependency = dependency.instance;
+          dependency = dependency.resolveToInstance();
         }
 
         resolvedDependencies.push(dependency);
       }
     }
 
-    // Add this module to the cache now! So that other modules know that this
-    // dependency is in progress of loading / creating.
-    if (module.id && !isRequire)
-      this.cache[module.id] = module;
-
-    if (!hasPromise) {
-      // This should be a performance win since we do not create an extra
-      // Promise which resolves immediately.
-      this.callFactoryCallback(
-          module,
-          resolvedDependencies
-      );
-    } else {
-      // Create Promise resolving if all dependencies are resolved.
-      module.instance = Promise.all(resolvedDependencies)
-        .then(function(resolvedDependencies) {
-            return this.callFactoryCallback(
-                module,
-                resolvedDependencies
-            );
-          }.bind(this));
-    }
-
-    return module;
+    return Promise.all(resolvedDependencies);
   };
 
 
+
   /**
-   * Execute the module factory function and set the cached module to ready state.
+   * Execute the module factory function and set the result as instance for
+   * this module.
    *
-   * @param  {object} module The object representing the module.
-   * @param  {array} resolvedDependencies
-   * @return {mixed} The module object containing creating the executed instance.
+   * @param  {Module} module The object representing the module.
+   * @return {mixed} The instance which the module factory created.
    * @this {Minjector}
    */
-  _proto.callFactoryCallback = function(module, resolvedDependencies) {
+  _proto.callFactory = function(module) {
+    var instance;
     try {
-      module.instance = module.factory.apply(null, resolvedDependencies);
+      instance = module.factory.apply(
+        null,
+        module.resolvedDependencies
+      );
     } catch (e) {
-      console.error(e);
+      console.error('Error calling module factory function (' + module.path +
+          '): ', e.stack ? e.stack : e);
     }
 
-    module.ready = true;
-    delete this.isRequired[module.id];
-
-    var i, l;
-    for (i = 0, l = module.listen.length; i < l; i++) {
-      module.listen[i](module.instance);
-    }
-
-    delete module.listen;
-    return module;
+    module.instance = instance;
+    module.fireOnCreation();
+    module.listen = [];
+    return instance;
   };
 
 
   /**
-   * Returning a Promise which is listening for the module creation event.
-   * By means of resolving on this very event.
-   * @param  {object} module The object representing the module.
-   * @return {Promise}
+   * @param  {string} id Id of the dependency/module to require.
+   * @return {object|function} The factory result (created module).
+   * @this {Minjector}
    */
-  _proto.listenOnCreation = function(module) {
-    return new Promise(function(resolve, reject) {
-      module.listen.push(function(moduleInstance) {
-        resolve(moduleInstance);
-      });
-    });
-  };
+  /**
+   * Enviroment specific "require".
+   * "Node.js" is using "require" to include modules.
+   *
+   * @param  {string} path Path of the dependency
+   * @param  {Module} module Module of the dependency
+   * @param  {string} id Id of the dependency
+   * @param  {Module} parentModule Parent module of the dependency
+   * @return {Promise}
+   * @this {Minjector}
+   */
+  _proto.requireDependency = isNodeJs ?
 
+    function(path, module, id, parentModule) {
+      var _this = this;
+      return new Promise(function(resolve) {
+        process.nextTick(function() {
+          require(path);
+          _this.processDefineQueue(id, parentModule);
 
-  if (isNodeJs) {
-    /**
-     * Enviroment specific "require".
-     * "Node.js" is using native "require" for inclucion.
-     *
-     * @param  {string} id Id of the dependency/module to require.
-     * @param {object} parent The parent module of defined id.
-     * @return {object|function} The factory result (created module).
-     * @this {Minjector}
-     */
-    _proto.requireDependency = function(id, parent) {
-      require(this.createPath(id, parent));
-
-      this.processDefineQueue(id, parent);
-
-      var resolvedModule = this.cache[id];
-      if (!resolvedModule.ready) {
-        // The module is not ready but we have to return something
-        // due to Node.js synchronous execution. Therefore return a Promise
-        // resolving after creation, which lets the "parent" module wait either.
-        return new Promise(function(resolve, reject) {
-          resolvedModule.listen.push(function(moduleInstance) {
-            resolve(moduleInstance);
-          });
+          resolve(module.resolveToInstance());
         });
-      }
+      });
+    } :
 
-      return resolvedModule.instance;
+    function(path, module, id, parentModule) {
+      var _this = this;
+      return new Promise(function(resolve, reject) {
+        var scriptTag = document.createElement('script');
+        scriptTag.src = path + '.js';
+        scriptTag.type = 'text/javascript';
+        scriptTag.charset = 'utf-8';
+
+        scriptTag.addEventListener('load', function() {
+          _this.processDefineQueue(id, parentModule);
+          resolve(module.resolveToInstance());
+        }, false);
+
+        _this.domDocumentHead.appendChild(scriptTag);
+      });
     };
 
-  } else {
+
+  if (!isNodeJs) {
     /**
      * Performance issue. Access document only once and save reference.
      * @type {Element}
      */
     _proto.domDocumentHead = document.head;
 
-
-    /**
-     * Enviroment specific "require".
-     * "DOM" implementation.
-     *
-     * @param  {string} id Id of the dependency/module to require.
-     * @param {object} parent The parent module of defined id.
-     * @return {mixed} A Promise which will create the module.
-     * @this {Minjector}
-     */
-    _proto.requireDependency = function(id, parent) {
-      return new Promise(function(resolve, reject) {
-        var scriptTag = document.createElement('script');
-        scriptTag.src = this.createPath(id, parent) + '.js';
-        scriptTag.type = 'text/javascript';
-        scriptTag.charset = 'utf-8';
-        scriptTag._moduleId = id;
-
-        scriptTag.addEventListener('load', function(event) {
-          var moduleId = event.target._moduleId;
-
-          // Define was called from the loaded script.
-          // This event and the execution of the loaded script
-          // happens synchronous (Immediately after execution of the loaded
-          // script).
-          // Therefore this.defineQueue holds now all the in this
-          // loaded script executed define()'s and we want to process them now.
-
-          // Kind of tricky here. This might return the Promise from
-          // @see this.createModule() which resolves if all dependencies of
-          // this module are reseolved. Then and only then we can create
-          // and resolve this module as well. This closes the recursive
-          // "Promise / async loading" chain
-          this.processDefineQueue(moduleId, parent);
-          var resolvedModule = this.cache[moduleId];
-
-          if (!resolvedModule.ready) {
-            // Since the module is defined but not ready, resolve on
-            // creation event.
-            resolvedModule.listen.push(function(moduleInstance) {
-              resolve(moduleInstance);
-            });
-
-          } else {
-            resolve(resolvedModule.instance);
-          }
-        }.bind(this), false);
-
-        this.domDocumentHead.appendChild(scriptTag);
-      }.bind(this));
-    };
   }
 
 
   /**
    * Create the path for an module by its id.
+   *
+   * Candiate for memoizing!
    *
    * @param  {string} id Id of the dependency/module to require.
    * @param {object} parent The parent module of defined id.
@@ -476,8 +499,12 @@
    * @this {Minjector}
    */
   _proto.createPath = function(id, parent) {
+    if (id === 'require')
+      return id;
+
+    var cfg = this.cfg;
     // Check map config for module.
-    var fc, path, mapping = this.cfg.map[parent.id];
+    var fc, path, mapping = parent ? cfg.map[parent.id] : null;
     if (mapping && mapping[id])
       id = mapping[id];
 
@@ -494,8 +521,8 @@
 
     // Is base or lib module
     var base = fc === '.' || fc === '/' ?
-        this.cfg.baseUrl :
-        this.cfg.libUrl;
+        cfg.baseUrl :
+        cfg.libUrl;
 
     if (fc === '/')
       path = path.substr(1);
@@ -606,21 +633,26 @@
    * {@link https://github.com/amdjs/amdjs-api/wiki/require}
    * @param  {mixed}    mixed Id or array of dependencies.
    * @param  {function} callback
-   * @param {object} parentModule The module in which this require gets called.
+   * @param {Module} parentModule The module in which this require gets called.
    * @return {mixed} The required module on synchronous call.
    * @this {Minjector}
    */
   _proto.require = function(mixed, callback, parentModule) {
     if (typeof mixed === 'string') {
-      return this.cache[mixed].instance;
+      return this.cache[this.createPath(mixed, parentModule)].instance;
 
     } else if (Array.isArray(mixed)) {
-      this.createModule.call(
-          this,
-          this.initModule(parentModule.id, mixed, callback),
-          true
+      var tmpModule = new Module(
+        parentModule ? parentModule.id : undefined,
+        mixed, // dependencies
+        callback // factory
       );
 
+      if (parentModule)
+        tmpModule.parent = parentModule;
+
+      // Resolving dependencies and calling factory function.
+      this.createModule(tmpModule);
     } else {
       throw new Error('Invalid arguments signature for require()');
     }
@@ -629,15 +661,15 @@
 
   /**
    * Add instantiated module in ready state to the cache.
+   *
    * @param  {string} id       Module id.
    * @param  {mixed} instance The result of the modules factory function.
    * @this {Minjector}
    */
   _proto.mockModule = function(id, instance) {
-    this.cache[id] = {
-      ready: true,
-      instance: instance
-    };
+    var module = new Module(id);
+    module.instance = instance;
+    this.cache[this.createPath(id)] = module;
   };
 
 

@@ -156,16 +156,11 @@ __No support for plugins like suggested in the AMD spec.__
 Simplicity, this implementation serves to load JavaScript AMD like modules only.
 
 # Tests
-* [Jasmine (Node.js implementation)](https://github.com/pivotal/jasmine)
-* [Jasmine (Browser implementation)](http://jasmine.github.io/2.0/introduction.html)
+* [Jasmine](https://github.com/pivotal/jasmine)
 
-Tests implemented with jasmine 2.0. Running in Node.js and Browsers
+Tests implemented with jasmine 2.3.4 Running in Node.js and Browsers
 
 # Roadmap / Issues
-
-* Throw meaningful error in case of Factory function does not return
-
-* Add "map" config
 
 * Optimizer script, basically concatening modules,
   but supporting some kind of "top level entry points".
@@ -184,8 +179,6 @@ Tests implemented with jasmine 2.0. Running in Node.js and Browsers
   drawback since we planing to add an optimized version.
 
 * Support for loader plugins
-
-* local require() calls does not consider config.map at the moment
 
 * jasmine-node badly failes for some sort of global exceptions?!
   Require investigation and I consider changing the test framework.

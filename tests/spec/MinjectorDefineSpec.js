@@ -1,4 +1,4 @@
-describe('minjector', function() {
+describe('minjector define', function() {
   // ATTENTION:
   // This test spec is supposed to run in node AND browser.
 
@@ -26,25 +26,13 @@ describe('minjector', function() {
         libUrl: './data/lib/'
       });
     }
-
-    define.config({
-      map: {
-        'WantMappedModules': {
-          '/MapModule': '/mapped/mapit'
-        },
-        '/MapModule': {
-          'getMapped2': '/mapped/recmap'
-        },
-        'LibMappedModules': {
-          'MapToLibModule': 'MappedInLib'
-        }
-      }
-    });
   });
+
 
   describe('can handle AMD define', function() {
     it('and accepts anonymous module', function(done) {
       define(function() {
+        expect(true).toBe(true);
         done();
       });
     });
@@ -312,277 +300,32 @@ describe('minjector', function() {
       });
     });
 
-    it('and handle multiple anonym modules in single file' +
-       'overide each other',
-        function(done) {
-          define(['/OverwriteModule'], function(OverwriteModule) {
-            expect(typeof OverwriteModule).toBe('object');
-            expect(OverwriteModule.anonym2).toBe(2);
-            done();
-          });
+    it('handle different ids cause relative origins through unique absolute path\'s', function(done) {
+      // Tricky thing here is that module "/path/is/definite" gets referenced
+      // twice from different path's and therefore with differen "ids"
+      // once here with "/path/is/definite"
+      // and one in module "/path/origin" with relative path "./is/definite"
+      define(['/path/is/definite', '/path/origin'], function(definite, origin) {
+        expect(definite).toBe('definite99');
+        expect(origin).toBe('independent_definite99');
+
+        if (!isNodeJs) {
+          // To be sure that the "/path/is/definite.js" module was loaded once!
+          var scriptList = document.scripts;
+          var thirdScripts =
+              Array.prototype.filter.call(
+                  scriptList,
+                  function(element) {
+                    return /path\/is\/definite.js/
+                      .test(element.getAttribute('src'));
+                  }
+              );
+          expect(thirdScripts.length).toBe(1);
         }
-    );
 
-  });
-
-  describe('can handle path normalization', function() {
-    it('and normalize "./" correctly', function() {
-      define.minjector.config({'baseUrl': '/a/b/'});
-      expect(define.minjector.createPath(
-          './d',
-          {'id': './c', 'parent': null}
-          )).toBe('/a/b/d');
-
-      expect(define.minjector.createPath(
-          './f/g',
-          {'id': './c/d/e', 'parent': null}
-          )).toBe('/a/b/c/d/f/g');
-    });
-
-    it('and normalize "../" correctly', function() {
-      define.minjector.config({'baseUrl': '/a/b/'});
-      expect(define.minjector.createPath(
-          '../d',
-          {'id': './c', 'parent': null}
-          )).toBe('/a/d');
-
-      expect(define.minjector.createPath(
-          '../f/g',
-          {'id': './c/d/e', 'parent': null}
-          )).toBe('/a/b/c/f/g');
-
-      expect(define.minjector.createPath(
-          '../../f/g',
-          {'id': './c/d/e', 'parent': null}
-          )).toBe('/a/b/f/g');
-
-      define.minjector.config({'baseUrl': '/a/b/c/d/'});
-      expect(define.minjector.createPath(
-          '../../f',
-          {'id': 'e', 'parent': null}
-          )).toBe('/a/b/f');
-    });
-
-    it('and handle starting "/" in path', function() {
-      define.minjector.config({'baseUrl': '/a/b/'});
-      expect(define.minjector.createPath(
-          '/f/g',
-          {'id': 'c/d/e', 'parent': null}
-          )).toBe('/a/b/f/g');
-    });
-
-    it('and normalize parent path correctly', function() {
-      var parent1 = {'id': './c/d'};
-      var parent2 = {'id': './e/f/g'};
-      var parent3 = {'id': './h'};
-
-      parent3.parent = parent2;
-      parent2.parent = parent1;
-
-      define.minjector.config({'baseUrl': '/a/b/'});
-      expect(define.minjector.createPath(
-          './k',
-          {'id': './i/j', 'parent': parent3}
-          )).toBe('/a/b/c/e/f/i/k');
-    });
-
-    it('and normalize parent path correctly with interrupten', function() {
-      var parent1 = {'id': './c/d'};
-      var parent2 = {'id': './e/f/g'};
-      var parent3 = {'id': '/h'};
-
-      parent3.parent = parent2;
-      parent2.parent = parent1;
-
-      define.minjector.config({'baseUrl': '/a/b/'});
-      expect(define.minjector.createPath(
-          './k',
-          {'id': './i/j', 'parent': parent3}
-          )).toBe('/a/b/i/k');
-    });
-
-    it('do not cut /../ into nothing, allowing to use pahts above the' +
-        'absolute root e.g. "./my/../../path" => "../path"',
-        function() {
-          expect(define.minjector.normalizePath(
-              'a/b/',
-              '../../../d',
-              null
-              )).toBe('../d');
-
-          expect(define.minjector.normalizePath(
-              '/a/b/',
-              '../../../d',
-              null
-              )).toBe('/../d');
-
-          expect(define.minjector.normalizePath(
-              '/a/b/',
-              '../../../c/d/../..',
-              null
-              )).toBe('/..');
-
-          expect(define.minjector.normalizePath(
-              '/a/b/',
-              '../../../c/d/../../..',
-              null
-              )).toBe('/../..');
-        }
-    );
-
-  });
-
-  describe('can handle absolute and relative path resolution', function() {
-
-    it('and load modules relative to current', function(done) {
-      define(['/relative/IncludeRelative'], function(MyRelModule) {
-        expect(typeof MyRelModule).toBe('function');
-        var mmm = new MyRelModule();
-        expect(mmm.isRelative()).toBe('isRelative_goingRelative');
         done();
       });
     });
 
-    it('and load modules recursively relative to current', function(done) {
-      define(['/relative/IncludeRelative2'], function(MyRelModule2) {
-        expect(typeof MyRelModule2).toBe('function');
-        var mmm = new MyRelModule2();
-        expect(mmm.relative2()).toBe(
-            'isRelative2_TrulyAbs1_TrulyRelative1_TrulyRelative2'
-        );
-        done();
-      });
-    });
-  });
-
-  describe('can handle AMD local require', function() {
-    it('and load modules asynchronous', function(done) {
-      define(['require'], function(require) {
-        expect(typeof require).toBe('function');
-
-        require(['/RequiredModule'], function(RequiredModule) {
-          expect(typeof RequiredModule).toBe('object');
-          expect(RequiredModule.justRequired).toBe('AMD');
-          done();
-        });
-      });
-    });
-
-    it('and require relative paths correctly', function(done) {
-      define(['/require/RequireAbsolute'], function(RequireAbsolute) {
-        RequireAbsolute.doRelRequire(function(value) {
-          expect(value).toBe('12489357hmcranky');
-          done();
-        });
-      });
-    });
-
-    xit('inline define()\' resolution is not supported since inline defines ' +
-        'should not exist!',
-        function() {
-        }
-    );
-
-    it('and multiple require() call dont overide anonym defined()' +
-        ' modules',
-        function(done) {
-          define(['/req/Uniqueness', 'require'], function(Uniqueness, require) {
-            expect(typeof Uniqueness).toBe('function');
-
-            var u = new Uniqueness();
-            expect(u.uniquee()).toBe('uniquee');
-
-            var callback = function() {
-              var uni = require('/req/Uniqueness');
-              var un = new uni();
-              expect(un.uniquee()).toBe('uniquee');
-              done();
-            };
-
-            u.doRequireModule(callback);
-          });
-        }
-    );
-
-    // This is actually nonesense in browsers / asynchronous dependencies
-    // resolution, to realize this we would have to wait for the first
-    // dependency to be loaded to realize that the second one is inside
-    // the first one. But we definitely want to start load all dependencies
-    // immediately.
-    // ... continue on next it(...).
-    xit('and handle stupid dependency order', function(done) {
-      define(['/MixedModule', '/MixedId'], function(MixedModule, MixedId) {
-        expect(typeof MixedModule).toBe('object');
-        expect(MixedModule.anonym1).toBe(1);
-
-        expect(typeof MixedId).toBe('object');
-        expect(MixedId.mixed).toBe('id');
-        done();
-      });
-    });
-
-    // However the second dependency might be a:
-    // var SR2Module = require('CanBeRequiredSync');
-    // which is a synchronous call by definition of the AMD spec and just
-    // will/has to fail if the dependency is not available synchronously.
-    it('and handle synchronous require() calls', function(done) {
-      define(['require', '/SyncRequireModule'], function(require, SRModule) {
-        expect(typeof require).toBe('function');
-        expect(typeof SRModule).toBe('object');
-
-        var SR2Module = require('/CanBeRequiredSync');
-        expect(typeof SR2Module).toBe('object');
-        expect(SR2Module.iamSync).toBe('yes');
-        done();
-      });
-    });
-  });
-
-  describe('can handle a "libUrl" config param', function() {
-    it('and correctly includes modules from lib', function(done) {
-      define(['/lib/LibModule'], function(LibModule) {
-        expect(typeof LibModule).toBe('object');
-        expect(LibModule.libMethod()).toBe('yei');
-        done();
-      });
-    });
-  });
-
-  describe('can handle a "map" config param', function() {
-    it('and correctly mappging basic modules', function(done) {
-      // This tests also that the module id remains and will not change
-      // to the mapped name
-      define('WantMappedModules', ['/MapModule'], function(MapModule) {
-        expect(typeof MapModule).toBe('function');
-        var obj = new MapModule();
-        expect(obj.toString()).toBe('is_mapped_rec_mapped');
-        done();
-      });
-    });
-
-    it('and correctly mappging lib modules', function(done) {
-      // This tests also that the module id remains and will not change
-      // to the mapped name
-      define('LibMappedModules', ['MapToLibModule'], function(MapModule) {
-        expect(typeof MapModule).toBe('function');
-        var obj = new MapModule();
-        expect(obj.toString()).toBe('lib_mapped');
-        done();
-      });
-    });
-  });
-
-  // NOTE: Should always be last test since this produces javascript reference
-  // error and further executing can not be guaranteed.
-  describe('can handle usability errors', function() {
-    it('and usefully handles errors inside a factory function', function(done) {
-      spyOn(console, 'error').and.callFake(function() {
-        done();
-      }); //.and.callThrough();
-
-      define(['/errors/ErrorModule'], function() {
-        // ...
-      });
-    });
   });
 });
